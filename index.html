@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ops Board — Job Search</title>
+<style>
+  :root {
+    --bg: #10141a;
+    --panel: #161b23;
+    --panel-2: #1c222c;
+    --line: #2a323e;
+    --text: #e7e9ea;
+    --text-dim: #8b96a5;
+    --amber: #e8a33d;
+    --teal: #4fb8ae;
+    --red: #d9695f;
+    --green: #6ec97f;
+    --mono: ui-monospace, "SFMono-Regular", "IBM Plex Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", "IBM Plex Sans", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    padding: 24px 20px 60px;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .title-block .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--amber);
+    text-transform: uppercase;
+  }
+  .title-block h1 {
+    margin: 4px 0 0;
+    font-size: 26px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+  .clock {
+    font-family: var(--mono);
+    text-align: right;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .clock .live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--green);
+    font-weight: 600;
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+
+  .brief {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text-dim);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--teal);
+    padding: 12px 14px;
+    border-radius: 4px;
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+  .brief b { color: var(--text); }
+
+  /* Channels */
+  .channel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .channel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .channel-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .channel-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--bg);
+    background: var(--amber);
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 700;
+  }
+  .channel-name h2 { font-size: 15px; margin: 0; font-weight: 650; }
+  .channel-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+  .checked-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 5px 9px;
+    cursor: pointer;
+  }
+  .checked-btn:hover { border-color: var(--teal); color: var(--teal); }
+  .checked-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .feeds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 14px 16px;
+  }
+  .feed-link {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    text-decoration: none;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    padding: 7px 12px;
+    border-radius: 5px;
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+  .feed-link:hover { border-color: var(--amber); color: var(--amber); }
+  .feed-link:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .feed-link .arrow { color: var(--text-dim); margin-left: 4px; }
+
+  .filter-note {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    padding: 0 16px 14px;
+    font-style: italic;
+  }
+
+  /* Tracker */
+  .tracker {
+    margin-top: 32px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px 18px 20px;
+  }
+  .tracker h2 {
+    font-size: 16px;
+    margin: 0 0 4px;
+  }
+  .tracker .sub { font-size: 12px; color: var(--text-dim); margin-bottom: 16px; }
+
+  .add-row {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 0.8fr auto;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 720px) { .add-row { grid-template-columns: 1fr 1fr; } }
+
+  input, select, textarea {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 5px;
+  }
+  input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--teal); outline-offset: 1px;
+  }
+  .add-btn {
+    background: var(--teal);
+    color: #0b1512;
+    border: none;
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: 5px;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  .add-btn:hover { filter: brightness(1.08); }
+  .add-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+  .leads { display: flex; flex-direction: column; gap: 8px; }
+  .lead {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 0.8fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  @media (max-width: 720px) { .lead { grid-template-columns: 1fr 1fr; } }
+  .lead a { color: var(--text); text-decoration: none; }
+  .lead a:hover { color: var(--amber); }
+  .lead .company { color: var(--text-dim); font-size: 12px; }
+  .status-pill {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    text-align: center;
+    border: none;
+    cursor: pointer;
+  }
+  .status-New { background: rgba(79,184,174,0.18); color: var(--teal); }
+  .status-Applied { background: rgba(232,163,61,0.18); color: var(--amber); }
+  .status-Interview { background: rgba(110,201,127,0.18); color: var(--green); }
+  .status-Rejected { background: rgba(217,105,95,0.18); color: var(--red); }
+  .del-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    border-radius: 5px;
+    padding: 5px 8px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .del-btn:hover { border-color: var(--red); color: var(--red); }
+
+  .empty {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 10px 4px;
+  }
+
+  .footer-note {
+    margin-top: 20px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  /* Posting cards */
+  .postings {
+    padding: 14px 16px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .posting-card {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .posting-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .posting-title { font-weight: 650; font-size: 14px; }
+  .posting-company { font-size: 12.5px; color: var(--amber); margin-top: 1px; }
+  .posting-meta { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .posting-desc { font-size: 12.5px; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
+  .posting-apply {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    text-decoration: none;
+    background: var(--amber);
+    color: #241a08;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+  .posting-apply:hover { filter: brightness(1.08); }
+  .posting-apply:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+  .snapshot-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    padding: 2px 16px 10px;
+  }
+  .more-toggle {
+    background: transparent;
+    border: none;
+    color: var(--teal);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    cursor: pointer;
+    padding: 6px 16px 12px;
+  }
+  .more-toggle:hover { text-decoration: underline; }
+  .action-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .action-btn {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .action-btn.primary { background: var(--amber); color: #241a08; }
+  .action-btn.secondary { background: var(--panel-2); color: var(--teal); border: 1px solid var(--line); }
+  .action-btn:hover { filter: brightness(1.08); }
+  .action-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+  .action-toast {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--green);
+    align-self: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .action-toast.show { opacity: 1; }
+
+  .api-config {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--green);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .api-config label {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .api-config input {
+    flex: 1;
+    min-width: 220px;
+  }
+  .api-status {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .live-jobs {
+    padding: 0 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .live-jobs.empty-hint {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 0 16px 12px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="title-block">
+      <div class="eyebrow">Personal Ops Board</div>
+      <h1>Dulex's Job Search</h1>
+    </div>
+    <div class="clock">
+      <div class="live"><span class="dot"></span> BOARD ACTIVE</div>
+      <div id="clockTime">--:--:--</div>
+      <div id="clockDate">-</div>
+    </div>
+  </div>
+
+  <div class="brief">
+    Each button below opens a <b>live search</b> on that site — bookmark this page and click through each morning for fresh postings. After a feed loads, set its <b>salary filter to $80K+</b> in that site's own filter panel (URL-encoded salary filters aren't reliable across sites, so this is the one manual step). For the fastest true daily refresh, click <b>"Set Alert"</b> links where offered — that emails you new postings automatically instead of requiring a manual check.
+    <br><br>
+    <b>Why isn't there a "fetch live postings" button?</b> Job sites block browser scripts from other pages (this one included) from pulling their listings directly — that's a security rule, not a choice I made. A button that pretended to do it would just silently break. The two buttons below are the honest equivalent: one opens everything at once, the other asks me (Claude) to pull real fresh postings into this dashboard next time you're in chat.
+  </div>
+
+  <div class="action-bar">
+    <button class="action-btn primary" id="checkAllBtn">⚡ Check All Boards Now</button>
+    <button class="action-btn secondary" id="copyPromptBtn">📋 Copy Refresh Request</button>
+    <span class="action-toast" id="actionToast"></span>
+  </div>
+
+  <div class="api-config">
+    <span class="api-status" id="apiStatus" style="font-size:12.5px;">Checking connection…</span>
+    <button class="action-btn secondary" id="fetchLiveBtn" style="padding:8px 14px; margin-left:auto;">🔄 Refresh Live Postings</button>
+  </div>
+
+  <!-- Lane 1: NOC / IT Support -->
+  <div class="channel" data-lane="noc">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 1</span>
+        <div>
+          <h2>NOC / IT Support / Systems</h2>
+          <div class="channel-sub">Your strongest lane — 8 years NG911 infrastructure, NOC ops</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="noc">Mark checked today</button>
+    </div>
+    <div class="postings">
+      <div class="posting-card">
+        <div class="posting-top">
+          <div>
+            <div class="posting-title">NOC Technician</div>
+            <div class="posting-company">Granite Telecommunications — Quincy, MA</div>
+            <div class="posting-meta">~$50K–$69K (Glassdoor est.) · On-site</div>
+          </div>
+          <a class="posting-apply" target="_blank" href="https://www.glassdoor.com/job-listing/noc-technician-granite-telecommunications-JV_IC1154667_KO0,14_KE15,41.htm?jl=1009919712219">View & Apply ↗</a>
+        </div>
+        <div class="posting-desc">Monitors and troubleshoots client network infrastructure, manages a ticket queue, and works across SD-WAN, firewalls, and enterprise networking. CCNA or Network+ called out directly as qualifying certs. <b style="color:var(--red)">Below your $80K target</b> — worth checking if it's a stepping stone toward their Cloud Ops / Senior roles.</div>
+      </div>
+    </div>
+    <div class="snapshot-note">Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.</div>
+    <div class="live-jobs" id="live-noc"></div>
+    <button class="more-toggle" data-toggle="noc">+ more search links</button>
+    <div class="feeds collapsed" data-feeds="noc">
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/jobs?q=NOC+engineer&l=Boston%2C+MA">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=NOC%20Engineer&location=Boston%2C%20Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/candidate/search?search=NOC+Engineer&location=Boston%2C+MA">ZipRecruiter <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.simplyhired.com/search?q=noc+engineer&l=massachusetts">SimplyHired <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.glassdoor.com/Job/jobs.htm?sc.keyword=NOC+engineer&locT=S&locId=1154532">Glassdoor <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Try also: "network operations", "systems administrator" — widen if results are thin.</div>
+  </div>
+
+  <!-- Lane 2: Field Service -->
+  <div class="channel" data-lane="field">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 2</span>
+        <div>
+          <h2>Field Service Engineer</h2>
+          <div class="channel-sub">Medical device / regulated equipment — direct match to Zeiss work</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="field">Mark checked today</button>
+    </div>
+    <div class="postings">
+      <div class="posting-card">
+        <div class="posting-top">
+          <div>
+            <div class="posting-title">Field Service Engineer II (Medical Devices)</div>
+            <div class="posting-company">Boston Scientific — Boston, MA</div>
+            <div class="posting-meta">~$77K–$104K (market est.) · Northeast region travel</div>
+          </div>
+          <a class="posting-apply" target="_blank" href="https://jobs.bostonscientific.com/job/Boston-Field-Service-Engineer-II-(Medical-Devices)-Boston,-MA-MA-02101/1405621600/">View & Apply ↗</a>
+        </div>
+        <div class="posting-desc">Supports Cardiovascular Division products (IVUS, AngioJet, FARAPULSE, and similar systems) across the Northeast. Requires an Associate's degree/technical diploma plus 1 year experience — <b style="color:var(--green)">or an equivalent combination of training and work experience</b>, which directly fits your background.</div>
+      </div>
+    </div>
+    <div class="snapshot-note">Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.</div>
+    <div class="live-jobs" id="live-field"></div>
+    <button class="more-toggle" data-toggle="field">+ more search links</button>
+    <div class="feeds collapsed" data-feeds="field">
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/jobs?q=field+service+engineer+medical+device&l=Massachusetts">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=Field%20Service%20Engineer%20Medical%20Device&location=Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/Jobs/Field-Service-Engineer/-in-Boston,MA">ZipRecruiter <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://jobs.bostonscientific.com/search/?q=field+service">Boston Scientific <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.glassdoor.com/Job/massachusetts-field-service-engineer-jobs-SRCH_IL.0,13_IS3399_KO14,36.htm">Glassdoor <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Also check GE HealthCare, Philips, Siemens Healthineers, Canon Medical career pages directly.</div>
+  </div>
+
+  <!-- Lane 3: Cybersecurity -->
+  <div class="channel" data-lane="cyber">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 3</span>
+        <div>
+          <h2>Cybersecurity / SOC Analyst</h2>
+          <div class="channel-sub">Apply Tier 1 / Associate level — matches your BCS 365 experience</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="cyber">Mark checked today</button>
+    </div>
+    <div class="postings">
+      <div class="posting-card">
+        <div class="posting-top">
+          <div>
+            <div class="posting-title">Cybersecurity Analyst / SOC Analyst (multiple levels)</div>
+            <div class="posting-company">State Street — Quincy, MA</div>
+            <div class="posting-meta">~$80K–$120K (market est.) · Hybrid</div>
+          </div>
+          <a class="posting-apply" target="_blank" href="https://www.glassdoor.com/Job/boston-soc-analyst-jobs-SRCH_IL.0,6_IC1154532_KO7,18.htm">View & Apply ↗</a>
+        </div>
+        <div class="posting-desc">State Street's Fusion Center runs 24/7 threat detection and response; they post multiple SOC tiers regularly. <b style="color:var(--amber)">Filter for "Cybersecurity Analyst" or entry associate-level</b> — the Lead/Senior postings want 4+ years dedicated SOC/IR experience, above your current level.</div>
+      </div>
+    </div>
+    <div class="snapshot-note">Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.</div>
+    <div class="live-jobs" id="live-cyber"></div>
+    <button class="more-toggle" data-toggle="cyber">+ more search links</button>
+    <div class="feeds collapsed" data-feeds="cyber">
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/jobs?q=SOC+analyst&l=Boston%2C+MA">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=SOC%20Analyst%20Tier%201&location=Boston%2C%20Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/Jobs/Soc-Analyst-Tier-1/-in-Boston,MA">ZipRecruiter <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.glassdoor.com/Job/boston-entry-level-cyber-security-jobs-SRCH_IL.0,6_IC1154532_KO7,33.htm">Glassdoor <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Search "Tier 1" or "Associate" explicitly — avoids senior-level mismatches.</div>
+  </div>
+
+  <!-- Lane 4: E911 / NG911 -->
+  <div class="channel" data-lane="e911">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 4</span>
+        <div>
+          <h2>E911 / NG911 Niche</h2>
+          <div class="channel-sub">Specialized — thin but high-fit when it hits</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="e911">Mark checked today</button>
+    </div>
+    <div class="snapshot-note" style="padding-top:12px;">Nothing matching your Technical/IT profile is currently open on NENA/MassNENA — this lane is link-only until something posts. Check back regularly; it moves in bursts.</div>
+    <div class="live-jobs" id="live-e911"></div>
+    <div class="feeds">
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/Jobs/E911-Engineer">ZipRecruiter (E911) <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/q-Ng911-jobs.html">Indeed (NG911) <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://jobs.nena.org/jobs/state/massachusetts/">NENA board <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.massnena.org/jobs-1-1">MassNENA <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.everbridge.com/about/careers/">Everbridge (Burlington, MA) <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/q-motorola-solutions-l-massachusetts-jobs.html">Motorola Solutions <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Lead with named product experience (Motorola CallWorks, OMON) in any application here.</div>
+  </div>
+
+  <!-- Lane 5: Desktop Support -->
+  <div class="channel" data-lane="desktop">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 5</span>
+        <div>
+          <h2>Desktop Support / End User Support</h2>
+          <div class="channel-sub">Direct match — six roles on your resume touch this exact work</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="desktop">Mark checked today</button>
+    </div>
+    <div class="postings">
+      <div class="posting-card">
+        <div class="posting-top">
+          <div>
+            <div class="posting-title">End User Support Specialist</div>
+            <div class="posting-company">Barings — Boston, MA</div>
+            <div class="posting-meta">$85,900–$137,500 (posted range) · On-site/Hybrid</div>
+          </div>
+          <a class="posting-apply" target="_blank" href="https://www.simplyhired.com/search?q=desktop+support+specialist&l=boston,+ma">View & Apply ↗</a>
+        </div>
+        <div class="posting-desc">First and second-line support for end users, resolving technical issues and maintaining high service standards — direct overlap with your Rue La La and Harvard SPH experience. Link goes to the search result; open it and look for the Barings listing specifically since direct-apply links go stale fast on aggregators.</div>
+      </div>
+    </div>
+    <div class="snapshot-note">Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.</div>
+    <div class="live-jobs" id="live-desktop"></div>
+    <button class="more-toggle" data-toggle="desktop">+ more search links</button>
+    <div class="feeds collapsed" data-feeds="desktop">
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/jobs?q=desktop+support&l=Boston%2C+MA">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=Desktop%20Support&location=Boston%2C%20Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/Jobs/Desktop-Support/-in-Boston,MA">ZipRecruiter <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.glassdoor.com/Job/boston-desktop-support-jobs-SRCH_IL.0,6_IC1154532_KO7,22.htm">Glassdoor <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Watch pay carefully in this lane — many desktop support postings run $50K–$70K; filter for "End User Support," "IT Support Engineer," or "Senior" to stay near your target.</div>
+  </div>
+
+  <!-- Lane 6: UN / NGO / International -->
+  <div class="channel" data-lane="ngo">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 6</span>
+        <div>
+          <h2>UN / NGO / International</h2>
+          <div class="channel-sub">Honest flag: most open roles are field-based, local-salary, or need prior INGO experience</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="ngo">Mark checked today</button>
+    </div>
+    <div class="snapshot-note" style="padding-top:12px;">Checked ReliefWeb/UNjobs directly — current ICT/IT Support postings are based in Ethiopia, Kenya, Syria, Philippines, etc., paying local rates well under $80K USD-equivalent, or explicitly require prior NGO/INGO field experience. No US-based, $80K+ match right now. Worth checking periodically — this shifts often — but don't expect this lane to move as fast as the others.</div>
+    <div class="feeds">
+      <a class="feed-link" target="_blank" href="https://careers.un.org/jobopening">UN Careers portal <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://reliefweb.int/jobs">ReliefWeb Jobs <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.impactpool.org/jobs/c/remote-ngo-jobs">Impactpool (remote NGO) <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://unjobs.org/skills/ict">UNjobs.org (ICT filter) <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Filter ReliefWeb/UNjobs by country = United States for any chance at a US-based salary. Field Service (GS) category roles are your best formal fit — see earlier conversation on the nationality restriction for Haiti-based posts specifically.</div>
+  </div>
+
+  <!-- Lane 7: Medical Device Cybersecurity / HTM -->
+  <div class="channel" data-lane="mdcs">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 7</span>
+        <div>
+          <h2>Medical Device Cybersecurity / HTM</h2>
+          <div class="channel-sub">Combines your Zeiss field service + BCS 365 security background — narrow niche, structural workforce shortage, low competition</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="mdcs">Mark checked today</button>
+    </div>
+    <div class="postings">
+      <div class="posting-card">
+        <div class="posting-top">
+          <div>
+            <div class="posting-title">BMET Cybersecurity Specialist</div>
+            <div class="posting-company">Sodexo (Healthcare Technology Management Division) — MA hospital clients</div>
+            <div class="posting-meta">Sodexo rotates this exact title across client hospitals nationally (had a Hyannis, MA / Boston-hospital posting) · check their careers page directly, not just aggregators</div>
+          </div>
+          <a class="posting-apply" target="_blank" href="https://www.indeed.com/q-medical-device-cybersecurity-l-massachusetts-jobs.html">View & Apply ↗</a>
+        </div>
+        <div class="posting-desc">Lead the collection of cybersecurity data in CMMS, conduct device risk assessments, manage vulnerability remediation/patching, and coordinate with hospital IT and device vendors. Your Zeiss change-control/audit-trail work and BCS 365 Sentinel/CrowdStrike/Qualys experience map directly onto this. <b style="color:var(--red)">CySA+ not required</b> — Security+ plus hands-on device experience is enough to be competitive now.</div>
+      </div>
+    </div>
+    <div class="snapshot-note">Snapshot pulled Aug 20, 2026 — narrow niche; expect a handful of active MA postings at a time, not a high-volume lane. Also watch GE Healthcare, Philips, Siemens Healthineers, and TRIMEDX directly — the other major HTM/device-service contractors that staff this role.</div>
+    <div class="live-jobs" id="live-mdcs"></div>
+    <button class="more-toggle" data-toggle="mdcs">+ more search links</button>
+    <div class="feeds collapsed" data-feeds="mdcs">
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=medical%20device%20cybersecurity&location=Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/q-BMET-cybersecurity-jobs.html">Indeed: BMET cybersecurity (national — rotates through MA) <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.himss.org/jobs">HIMSS Job Mine <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/candidate/search?search=medical+device+cybersecurity&location=Massachusetts">ZipRecruiter <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Try also: "healthcare IoT security", "clinical engineering cybersecurity". Widen location to New England if MA results are thin — this lane moves in bursts.</div>
+  </div>
+
+  <!-- Lane 8: BMET / Clinical Engineering -->
+  <div class="channel" data-lane="bmet">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 8</span>
+        <div>
+          <h2>BMET / Clinical Engineering</h2>
+          <div class="channel-sub">CBET certification path — formalizes your Zeiss device work; 30+ BMET programs closed in 5 years, only ~400 grads/yr vs ~7,300 annual openings</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="bmet">Mark checked today</button>
+    </div>
+    <div class="snapshot-note" style="padding-top:12px;">Link-only for now — no specific MA posting confirmed yet. Structural shortage means this is worth checking regularly even without a live hit.</div>
+    <div class="live-jobs" id="live-bmet"></div>
+    <div class="feeds">
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=biomedical%20equipment%20technician&location=Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/q-biomedical-equipment-technician-l-massachusetts-jobs.html">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.aami.org/careers/job-board">AAMI Job Board <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/candidate/search?search=BMET&location=Massachusetts">ZipRecruiter <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Lead with Zeiss CIRRUS OCT/HFA experience and FDA-regulated change-control work. Consider a BMET associate/certificate program (cuts CBET experience requirement from 4 years to 2).</div>
+  </div>
+
+  <!-- Lane 9: Healthcare IT / Epic Systems Analyst -->
+  <div class="channel" data-lane="healthit">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 9</span>
+        <div>
+          <h2>Healthcare IT / Epic Systems Analyst</h2>
+          <div class="channel-sub">BLS: 15% growth 2024–2034 — "much faster than average"; median $107K, often employer-sponsored Epic cert</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="healthit">Mark checked today</button>
+    </div>
+    <div class="snapshot-note" style="padding-top:12px;">Link-only for now — no specific MA posting confirmed yet.</div>
+    <div class="live-jobs" id="live-healthit"></div>
+    <div class="feeds">
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=healthcare%20IT%20analyst&location=Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/q-healthcare-it-analyst-l-massachusetts-jobs.html">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.himss.org/jobs">HIMSS Job Mine <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/candidate/search?search=Epic+analyst&location=Massachusetts">ZipRecruiter <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Employers frequently sponsor Epic certification after hire — don't screen yourself out for not having it yet.</div>
+  </div>
+
+  <!-- Lane 10: Cloud Security Engineer -->
+  <div class="channel" data-lane="cloudsec">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 10</span>
+        <div>
+          <h2>Cloud Security Engineer</h2>
+          <div class="channel-sub">Reactivates your Azure Fundamentals/AZ-500 background — highest ceiling of any lane ($130K–$225K)</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="cloudsec">Mark checked today</button>
+    </div>
+    <div class="snapshot-note" style="padding-top:12px;">Link-only for now — no specific MA posting confirmed yet.</div>
+    <div class="live-jobs" id="live-cloudsec"></div>
+    <div class="feeds">
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=cloud%20security%20engineer&location=Boston%2C%20Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/q-cloud-security-engineer-l-boston,-ma-jobs.html">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://jobs.isc2.org/">ISC2 Job Board <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/candidate/search?search=cloud+security+engineer&location=Boston%2C+MA">ZipRecruiter <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Reactivate AZ-500 and finish CySA+ first — the credential pairing is what unlocks this lane's top end.</div>
+  </div>
+
+  <!-- Lane 11: Clinical Applications / Medical Device Specialist -->
+  <div class="channel" data-lane="clinapp">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 11</span>
+        <div>
+          <h2>Clinical Applications / Medical Device Specialist</h2>
+          <div class="channel-sub">Closest lateral move from OCT field work — device fluency + client-facing training, not repair. $89K–$148K</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="clinapp">Mark checked today</button>
+    </div>
+    <div class="snapshot-note" style="padding-top:12px;">Link-only for now — no specific MA posting confirmed yet. Weakest fit of the new lanes if outbound sales is involved — screen postings for base-heavy vs. commission-heavy comp before applying.</div>
+    <div class="live-jobs" id="live-clinapp"></div>
+    <div class="feeds">
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=clinical%20applications%20specialist&location=Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/q-clinical-applications-specialist-l-massachusetts-jobs.html">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/candidate/search?search=clinical+specialist+medical+device&location=Massachusetts">ZipRecruiter <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Combines Clinical Applications Specialist and Medical Device Sales/Clinical Specialist — same buyer, same skill set, different comp structure per employer.</div>
+  </div>
+
+  <!-- Lane 12: Network Engineer -->
+  <div class="channel" data-lane="netqeng">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 12</span>
+        <div>
+          <h2>Network Engineer</h2>
+          <div class="channel-sub">Fastest to reactivate (CCNA refresh) — moderate ceiling ($90K–$110K), good fallback while pursuing higher-leverage lanes</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="netqeng">Mark checked today</button>
+    </div>
+    <div class="snapshot-note" style="padding-top:12px;">Link-only for now — no specific MA posting confirmed yet.</div>
+    <div class="live-jobs" id="live-netqeng"></div>
+    <div class="feeds">
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=network%20engineer&location=Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/q-network-engineer-l-massachusetts-jobs.html">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/candidate/search?search=network+engineer&location=Massachusetts">ZipRecruiter <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Refresh CCNA — shortest path back into a paying role while longer-lead lanes (Cloud Security, Healthcare IT) develop.</div>
+  </div>
+
+  <!-- Tracker -->
+
+  <div class="tracker">
+    <h2>Lead Tracker</h2>
+    <div class="sub">Saved privately to this browser session's storage — not shared.</div>
+
+    <div class="add-row">
+      <input id="inTitle" placeholder="Job title" />
+      <input id="inCompany" placeholder="Company" />
+      <input id="inUrl" placeholder="Link (paste URL)" />
+      <select id="inLane">
+        <option value="noc">NOC/IT</option>
+        <option value="field">Field Svc</option>
+        <option value="cyber">Cyber</option>
+        <option value="e911">E911</option>
+        <option value="desktop">Desktop</option>
+        <option value="ngo">UN/NGO</option>
+        <option value="mdcs">MDCS/HTM</option>
+        <option value="bmet">BMET/Clinical Eng</option>
+        <option value="healthit">Healthcare IT</option>
+        <option value="cloudsec">Cloud Security</option>
+        <option value="clinapp">Clinical Apps</option>
+        <option value="netqeng">Network Eng</option>
+      </select>
+      <button class="add-btn" id="addBtn">+ Add lead</button>
+    </div>
+
+    <div id="leadsList" class="leads">
+      <div class="empty">Loading your saved leads…</div>
+    </div>
+  </div>
+
+  <div class="footer-note">Refresh this page daily. Leads and "last checked" marks persist automatically.</div>
+
+</div>
+
+<script>
+  function setApiStatus(msg, ok) {
+    const el = document.getElementById('apiStatus');
+    el.textContent = msg;
+    el.style.color = ok ? 'var(--green)' : 'var(--text-dim)';
+  }
+
+  function renderLiveJobs(laneKey, jobs, errorMsg) {
+    const el = document.getElementById(`live-${laneKey}`);
+    if (!el) return;
+    if (errorMsg) {
+      el.innerHTML = `<div class="empty" style="color:var(--red);">Live fetch failed: ${escapeHtml(errorMsg)}</div>`;
+      return;
+    }
+    if (!jobs || !jobs.length) {
+      el.innerHTML = `<div class="empty">No live results from the API for this lane right now.</div>`;
+      return;
+    }
+    el.innerHTML = jobs.map(j => `
+      <div class="posting-card">
+        <div class="posting-top">
+          <div>
+            <div class="posting-title">${escapeHtml(j.title || 'Untitled role')}</div>
+            <div class="posting-company">${escapeHtml(j.company || 'Unknown company')} — ${escapeHtml(j.location || '')}</div>
+            <div class="posting-meta">${j.salaryMin ? '$' + Math.round(j.salaryMin).toLocaleString() : '?'}${j.salaryMax ? '–$' + Math.round(j.salaryMax).toLocaleString() : ''} · via Adzuna</div>
+          </div>
+          ${j.url ? `<a class="posting-apply" target="_blank" href="${escapeAttr(j.url)}">View & Apply ↗</a>` : ''}
+        </div>
+        ${j.description ? `<div class="posting-desc">${escapeHtml(j.description)}…</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // Same-origin now — dashboard and API are served by the same Railway app,
+  // so this just calls a relative path. No URL configuration needed.
+  async function fetchLivePostings() {
+    setApiStatus('Fetching…', false);
+    try {
+      const res = await fetch('/api/jobs/all');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      let totalJobs = 0;
+      Object.entries(data).forEach(([laneKey, laneData]) => {
+        if (laneData.error) {
+          renderLiveJobs(laneKey, null, laneData.error);
+        } else {
+          renderLiveJobs(laneKey, laneData.jobs, null);
+          totalJobs += (laneData.jobs || []).length;
+        }
+      });
+      setApiStatus(`✓ Live — ${totalJobs} postings loaded`, true);
+    } catch (e) {
+      setApiStatus(`Static snapshot only — live API unreachable (${e.message})`, false);
+    }
+  }
+
+  document.getElementById('fetchLiveBtn').addEventListener('click', fetchLivePostings);
+
+  // Try once automatically on load — silent fallback to static snapshot if not deployed yet
+  fetchLivePostings();
+
+  // Action bar: Check All Boards Now
+  const PRIMARY_SEARCHES = [
+    'https://www.indeed.com/jobs?q=NOC+engineer&l=Boston%2C+MA',
+    'https://www.indeed.com/jobs?q=field+service+engineer+medical+device&l=Massachusetts',
+    'https://www.indeed.com/jobs?q=SOC+analyst&l=Boston%2C+MA',
+    'https://www.ziprecruiter.com/Jobs/E911-Engineer',
+    'https://www.indeed.com/jobs?q=desktop+support&l=Boston%2C+MA',
+    'https://reliefweb.int/jobs',
+    'https://www.indeed.com/q-medical-device-cybersecurity-l-massachusetts-jobs.html',
+    'https://www.indeed.com/q-biomedical-equipment-technician-l-massachusetts-jobs.html',
+    'https://www.indeed.com/q-healthcare-it-analyst-l-massachusetts-jobs.html',
+    'https://www.indeed.com/q-cloud-security-engineer-l-boston,-ma-jobs.html',
+    'https://www.indeed.com/q-clinical-applications-specialist-l-massachusetts-jobs.html',
+    'https://www.indeed.com/q-network-engineer-l-massachusetts-jobs.html'
+  ];
+  function showToast(msg) {
+    const t = document.getElementById('actionToast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+  document.getElementById('checkAllBtn').addEventListener('click', () => {
+    let opened = 0;
+    PRIMARY_SEARCHES.forEach(url => {
+      const w = window.open(url, '_blank');
+      if (w) opened++;
+    });
+    if (opened === PRIMARY_SEARCHES.length) {
+      showToast(`✓ Opened ${opened} live searches`);
+    } else {
+      showToast(`Opened ${opened}/${PRIMARY_SEARCHES.length} — your browser may have blocked pop-ups, allow them for this page`);
+    }
+  });
+
+  document.getElementById('copyPromptBtn').addEventListener('click', async () => {
+    const prompt = "Refresh my job search dashboard — pull current postings for all 12 lanes (NOC/IT, Field Service, Cybersecurity/SOC, E911/NG911, Desktop Support, UN/NGO, Medical Device Cybersecurity/HTM, BMET/Clinical Engineering, Healthcare IT/Epic, Cloud Security Engineer, Clinical Applications/Device Specialist, Network Engineer) in Massachusetts/New England, $80K+ where applicable, and rebuild the dashboard cards with real current listings.";
+    try {
+      await navigator.clipboard.writeText(prompt);
+      showToast('✓ Copied — paste into a chat with Claude');
+    } catch (e) {
+      showToast('Could not copy — select and copy manually: ' + prompt);
+    }
+  });
+
+  // Toggle "more search links"
+  document.querySelectorAll('[data-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lane = btn.getAttribute('data-toggle');
+      const feeds = document.querySelector(`[data-feeds="${lane}"]`);
+      const isCollapsed = feeds.classList.toggle('collapsed');
+      btn.textContent = isCollapsed ? '+ more search links' : '– hide search links';
+    });
+  });
+
+  // Clock
+  function tick() {
+    const now = new Date();
+    document.getElementById('clockTime').textContent = now.toLocaleTimeString('en-US', { hour12: false });
+    document.getElementById('clockDate').textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // "Mark checked today" per lane
+  const LANE_KEY = 'lane-checked-v1';
+  async function loadLaneChecks() {
+    try {
+      const res = await window.storage.get(LANE_KEY, false);
+      return res && res.value ? JSON.parse(res.value) : {};
+    } catch (e) { return {}; }
+  }
+  async function saveLaneChecks(data) {
+    try { await window.storage.set(LANE_KEY, JSON.stringify(data), false); }
+    catch (e) { console.error('save failed', e); }
+  }
+  function renderLaneCheck(btn, dateStr) {
+    const today = new Date().toDateString();
+    if (dateStr === today) {
+      btn.textContent = '✓ Checked today';
+      btn.style.color = 'var(--green)';
+      btn.style.borderColor = 'var(--green)';
+    } else {
+      btn.textContent = 'Mark checked today';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }
+  }
+  document.querySelectorAll('[data-check]').forEach(async (btn) => {
+    const lane = btn.getAttribute('data-check');
+    const checks = await loadLaneChecks();
+    renderLaneCheck(btn, checks[lane]);
+    btn.addEventListener('click', async () => {
+      const checks = await loadLaneChecks();
+      checks[lane] = new Date().toDateString();
+      await saveLaneChecks(checks);
+      renderLaneCheck(btn, checks[lane]);
+    });
+  });
+
+  // Lead tracker
+  const LEADS_KEY = 'leads-v1';
+  let leads = [];
+
+  async function loadLeads() {
+    try {
+      const res = await window.storage.get(LEADS_KEY, false);
+      leads = res && res.value ? JSON.parse(res.value) : [];
+    } catch (e) { leads = []; }
+    renderLeads();
+  }
+  async function persistLeads() {
+    try { await window.storage.set(LEADS_KEY, JSON.stringify(leads), false); }
+    catch (e) { console.error('save failed', e); }
+  }
+
+  function laneLabel(l) {
+    return { noc: 'NOC/IT', field: 'Field Svc', cyber: 'Cyber', e911: 'E911', desktop: 'Desktop', ngo: 'UN/NGO' }[l] || l;
+  }
+
+  function renderLeads() {
+    const el = document.getElementById('leadsList');
+    if (!leads.length) {
+      el.innerHTML = '<div class="empty">No leads saved yet — add one above, or paste in a link you found on any lane.</div>';
+      return;
+    }
+    el.innerHTML = leads.map((lead, i) => `
+      <div class="lead">
+        <div>
+          ${lead.url ? `<a href="${escapeAttr(lead.url)}" target="_blank">${escapeHtml(lead.title || 'Untitled')}</a>` : escapeHtml(lead.title || 'Untitled')}
+        </div>
+        <div class="company">${escapeHtml(lead.company || '—')}</div>
+        <div class="company">${laneLabel(lead.lane)}</div>
+        <select class="status-pill status-${lead.status}" data-idx="${i}" data-role="status">
+          <option value="New" ${lead.status === 'New' ? 'selected' : ''}>New</option>
+          <option value="Applied" ${lead.status === 'Applied' ? 'selected' : ''}>Applied</option>
+          <option value="Interview" ${lead.status === 'Interview' ? 'selected' : ''}>Interview</option>
+          <option value="Rejected" ${lead.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
+        </select>
+        <button class="del-btn" data-idx="${i}" data-role="del">Remove</button>
+      </div>
+    `).join('');
+
+    el.querySelectorAll('[data-role="status"]').forEach(sel => {
+      sel.addEventListener('change', async (e) => {
+        const idx = parseInt(e.target.getAttribute('data-idx'));
+        leads[idx].status = e.target.value;
+        await persistLeads();
+        renderLeads();
+      });
+    });
+    el.querySelectorAll('[data-role="del"]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const idx = parseInt(e.target.getAttribute('data-idx'));
+        leads.splice(idx, 1);
+        await persistLeads();
+        renderLeads();
+      });
+    });
+  }
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str || '';
+    return d.innerHTML;
+  }
+  function escapeAttr(str) {
+    return (str || '').replace(/"/g, '&quot;');
+  }
+
+  document.getElementById('addBtn').addEventListener('click', async () => {
+    const title = document.getElementById('inTitle').value.trim();
+    const company = document.getElementById('inCompany').value.trim();
+    const url = document.getElementById('inUrl').value.trim();
+    const lane = document.getElementById('inLane').value;
+    if (!title && !company && !url) return;
+    leads.unshift({ title, company, url, lane, status: 'New', dateAdded: new Date().toISOString() });
+    await persistLeads();
+    renderLeads();
+    document.getElementById('inTitle').value = '';
+    document.getElementById('inCompany').value = '';
+    document.getElementById('inUrl').value = '';
+  });
+
+  loadLeads();
+</script>
+</body>
+</html>
