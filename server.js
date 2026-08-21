@@ -22,6 +22,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const APP_ID = process.env.ADZUNA_APP_ID;
 const APP_KEY = process.env.ADZUNA_APP_KEY;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 
 app.use(cors({ origin: ALLOWED_ORIGIN }));
@@ -189,6 +190,104 @@ app.get('/api/jobs/all', async (req, res) => {
       })
     );
     res.json(Object.fromEntries(results));
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// Scout — a single endpoint that handles both freeform career-advice chat
+// AND structured postings search, sharing one background prompt so there's
+// no duplicate system prompt (and no duplicate API surface) to maintain.
+// Costs a small amount per call (web search + generation) — the real, paid
+// Anthropic API, unlike Adzuna's free tier. Postings search results are
+// cached for 12 hours so repeat clicks (or accidental double-clicks) don't
+// re-trigger a paid search each time.
+const LANE_ID_LIST = 'noc, field, cyber, e911, desktop, ngo, mdcs, bmet, healthit, cloudsec, clinapp, netqeng';
+
+const SCOUT_SYSTEM_PROMPT = `You are "Scout," a career-niche advisor for Dulex Cherenfant, a Boston-area IT/field-service professional, embedded in his personal job search dashboard.
+
+BACKGROUND (ground every answer in this — never generic advice):
+- 15+ years IT: NOC Engineer at Comtech (8 yrs, NG911/VoIP mission-critical infrastructure for Massachusetts, SolarWinds, 99%+ SLA), Security Analyst at BCS 365 (Microsoft Sentinel, CrowdStrike Falcon, Qualys — vulnerability analysis, incident investigation), TechOps Engineer at VMware (datacenter/R&D infra), currently Field Service Engineer (contract via Resourceful Inc.) servicing Zeiss CIRRUS OCT/HFA diagnostic instruments under FDA-regulated change-control procedures across New England.
+- Certifications (previously held/lapsed): CompTIA Security+, Network+, A+, Cisco CCNA, Microsoft Azure Fundamentals, AZ-500/Azure Security Engineer Associate (Entra ID, RBAC, PIM, Conditional Access, Key Vault, Defender for Cloud, Sentinel/KQL). Currently studying CySA+.
+- No bachelor's degree — two years of general college coursework plus an in-person IT program, no degree conferred.
+- Trilingual: English, French, Haitian Creole. Based in Randolph, MA.
+- Also a solo software founder running several live products for the Haitian diaspora, with a large Facebook audience across Boston/Miami/NYC/Montreal/Haiti. Prefers async/inbound work over outbound or in-person sales.
+- Target: $80K+ where the lane supports it, Massachusetts/New England, on-site or hybrid.
+
+THE DASHBOARD'S 12 LANES (use these exact laneId values when returning postings, nothing else — don't re-suggest these as "new" niches, build on them or go genuinely further): ${LANE_ID_LIST}
+
+You operate in two modes depending on what's asked:
+1. CONVERSATIONAL — answer questions about fit, demand, strategy, or new niche combinations. Use web search for anything checkable (demand, employers, current postings) rather than guessing. Keep answers tight: 2-4 short paragraphs or a short list, ending with one concrete next action. No filler, no "as an AI" disclaimers, no restating his bio back to him.
+2. POSTINGS SEARCH — when explicitly asked to find/return current postings as JSON, search the web for 5 to 8 REAL, CURRENTLY OPEN postings spread across the lanes above. Only include a posting if you found a real URL via search — never invent one. Respond with ONLY a raw JSON array in that case, no markdown fences, no other text. Schema per item: {"laneId": "...", "laneTitle": "2-4 word label", "title": "...", "company": "...", "meta": "salary/work-arrangement, a few words", "url": "...", "desc": "1-2 sentences, second person, specific to his background", "postedDate": "Mon DD, YYYY — today"}`;
+
+let cachedPostings = null; // { items, refreshedAt } — in-memory, cleared on server restart
+const POSTINGS_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+
+async function callScout(messages) {
+  const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-5',
+      max_tokens: 2000,
+      system: SCOUT_SYSTEM_PROMPT,
+      messages,
+      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+    }),
+  });
+  if (!apiRes.ok) {
+    const text = await apiRes.text().catch(() => '');
+    throw new Error(`Anthropic API error ${apiRes.status}: ${text.slice(0, 300)}`);
+  }
+  const data = await apiRes.json();
+  const textBlocks = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
+  return textBlocks.join('\n\n').trim();
+}
+
+// mode: 'chat' (default) — { messages: [...] } -> { reply }
+// mode: 'postings' — no body needed -> { items, refreshedAt, fromCache }
+app.post('/api/scout', async (req, res) => {
+  if (!ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on the server — add it in Railway → Variables.' });
+  }
+  const mode = req.body.mode === 'postings' ? 'postings' : 'chat';
+
+  try {
+    if (mode === 'postings') {
+      const forceRefresh = req.body.forceRefresh === true;
+      const now = Date.now();
+      if (!forceRefresh && cachedPostings && (now - cachedPostings.fetchedAt) < POSTINGS_CACHE_TTL_MS) {
+        return res.json({ items: cachedPostings.items, refreshedAt: cachedPostings.refreshedAt, fromCache: true });
+      }
+
+      const raw = await callScout([{ role: 'user', content: 'Find current real postings now (POSTINGS SEARCH mode) and return the JSON array.' }]);
+      const cleanedRaw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
+      const jsonStart = cleanedRaw.indexOf('[');
+      const jsonEnd = cleanedRaw.lastIndexOf(']');
+      if (jsonStart === -1 || jsonEnd === -1) throw new Error('Model did not return a JSON array');
+      const parsed = JSON.parse(cleanedRaw.slice(jsonStart, jsonEnd + 1));
+
+      const validLanes = LANE_ID_LIST.split(', ');
+      const cleaned = parsed.filter(p => p && p.url && p.title && validLanes.includes(p.laneId));
+      if (!cleaned.length) throw new Error('No valid postings came back from the search');
+
+      const refreshedAt = new Date().toISOString();
+      cachedPostings = { items: cleaned, refreshedAt, fetchedAt: now };
+      return res.json({ items: cleaned, refreshedAt, fromCache: false });
+    }
+
+    // chat mode
+    const messages = Array.isArray(req.body.messages) ? req.body.messages : null;
+    if (!messages || !messages.length) {
+      return res.status(400).json({ error: 'messages array required' });
+    }
+    const reply = await callScout(messages.map(m => ({ role: m.role, content: m.content })))
+      || "Couldn't generate a response — try rephrasing.";
+    res.json({ reply });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
