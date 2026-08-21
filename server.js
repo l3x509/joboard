@@ -27,10 +27,11 @@ const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 app.use(cors({ origin: ALLOWED_ORIGIN }));
 app.use(express.json());
 
-// Serve the dashboard itself as a static file from /public — this is what
-// makes the dashboard's `fetch('/api/jobs/all')` calls work: the page and
-// the API are served from the same Railway origin, so relative URLs resolve.
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve the dashboard directly from the repo root — matches this repo's
+// flat file layout (index.html sits alongside server.js, no /public subfolder).
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // ---- Lane definitions: edit these anytime to tune your search terms ----
 const LANES = {
