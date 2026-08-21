@@ -38,7 +38,7 @@
   .shell {
     display: grid;
     grid-template-columns: 250px 1fr 300px;
-    grid-template-rows: 56px 1fr;
+    grid-template-rows: 56px auto 1fr;
     height: 100vh;
     min-width: 1100px;
   }
@@ -71,6 +71,71 @@
   }
   .tb-btn:hover { border-color: var(--amber-dim); color: var(--text); }
   .tb-btn.primary { background: var(--amber-dim); border-color: var(--amber); color: #fff2df; }
+  .tb-btn.scout { background: var(--teal-dim); border-color: var(--teal); color: #d9fdf9; }
+
+  /* ===== Scout chat overlay ===== */
+  .scout-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 100;
+    display: none; align-items: center; justify-content: center;
+  }
+  .scout-backdrop.open { display: flex; }
+  .scout-modal {
+    width: 640px; height: 680px; max-height: 88vh; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .scout-modal-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--panel-2);
+    border-radius: 10px 10px 0 0;
+  }
+  .scout-modal-title { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 14px; }
+  .scout-modal-title .teal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+  .scout-modal-sub { font-family: var(--mono); font-size: 10px; color: var(--text-faint); margin-top: 2px; }
+  .scout-close-btn {
+    background: transparent; border: 1px solid var(--line); color: var(--text-dim);
+    border-radius: 5px; padding: 5px 10px; cursor: pointer; font-family: var(--mono); font-size: 11px;
+  }
+  .scout-close-btn:hover { border-color: var(--red); color: var(--red); }
+  .scout-msgs { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+  .scout-msg-user { align-self: flex-end; max-width: 78%; }
+  .scout-msg-user-body {
+    background: var(--teal-dim); border: 1px solid var(--teal); color: var(--text);
+    padding: 9px 13px; border-radius: 8px 8px 2px 8px; font-size: 12.5px; line-height: 1.5;
+  }
+  .scout-msg-bot { max-width: 88%; }
+  .scout-msg-bot-label { font-family: var(--mono); font-size: 9.5px; color: var(--teal); margin-bottom: 4px; }
+  .scout-msg-bot-body {
+    background: var(--panel-2); border: 1px solid var(--line);
+    padding: 11px 14px; border-radius: 2px 8px 8px 8px; font-size: 12.5px; line-height: 1.6;
+  }
+  .scout-msg-bot-body p { margin: 0 0 8px; }
+  .scout-msg-bot-body p:last-child { margin-bottom: 0; }
+  .scout-msg-bot-body ul { margin: 4px 0 8px; padding-left: 16px; }
+  .scout-msg-bot-body strong { color: var(--amber); }
+  .scout-thinking { display: flex; gap: 4px; padding: 2px 0; }
+  .scout-thinking span { width: 5px; height: 5px; border-radius: 50%; background: var(--teal); animation: sthink 1.2s ease-in-out infinite; }
+  .scout-thinking span:nth-child(2) { animation-delay: .15s; }
+  .scout-thinking span:nth-child(3) { animation-delay: .3s; }
+  @keyframes sthink { 0%,60%,100%{opacity:.25} 30%{opacity:1} }
+  .scout-quick-row { padding: 0 18px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .scout-chip {
+    font-family: var(--mono); font-size: 10px; color: var(--text-dim); background: var(--panel-2);
+    border: 1px solid var(--line); border-radius: 12px; padding: 5px 10px; cursor: pointer;
+  }
+  .scout-chip:hover { border-color: var(--teal); color: var(--teal); }
+  .scout-input-row { display: flex; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
+  .scout-input-row textarea {
+    flex: 1; resize: none; background: var(--bg); border: 1px solid var(--line); color: var(--text);
+    font-family: var(--sans); font-size: 12.5px; padding: 9px 12px; border-radius: 6px;
+    max-height: 80px; min-height: 38px; line-height: 1.4;
+  }
+  .scout-input-row textarea:focus { outline: none; border-color: var(--teal-dim); }
+  .scout-send-btn {
+    background: var(--teal-dim); color: #d9fdf9; border: 1px solid var(--teal); border-radius: 6px;
+    padding: 0 16px; font-family: var(--mono); font-size: 11.5px; font-weight: 600; cursor: pointer;
+  }
+  .scout-send-btn:disabled { opacity: .4; cursor: default; }
   .api-status { font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); }
   .toast {
     position: fixed; top: 62px; right: 18px; background: var(--panel-2); border: 1px solid var(--teal);
@@ -80,6 +145,47 @@
   .toast.show { opacity: 1; transform: translateY(0); }
 
   /* ===== Left rail: lane nav ===== */
+
+  .curated-strip {
+    grid-column: 1 / 4;
+    background: var(--rail); border-bottom: 1px solid var(--line);
+    padding: 12px 20px 14px;
+  }
+  .curated-strip-head {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+  }
+  .curated-strip-title {
+    display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650;
+  }
+  .curated-strip-title .amber-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+  .curated-strip-sub { font-family: var(--mono); font-size: 10px; color: var(--text-faint); margin-left: 14px; }
+  .curated-collapse-btn {
+    font-family: var(--mono); font-size: 10.5px; background: transparent; border: 1px solid var(--line);
+    color: var(--text-dim); border-radius: 5px; padding: 5px 10px; cursor: pointer;
+  }
+  .curated-collapse-btn:hover { border-color: var(--text-dim); }
+  .curated-cards {
+    display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px;
+  }
+  .curated-cards.collapsed { display: none; }
+  .curated-card {
+    flex: 0 0 300px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; cursor: pointer; transition: border-color .15s ease;
+  }
+  .curated-card:hover { border-color: var(--amber-dim); }
+  .curated-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+  .curated-lane-tag {
+    font-family: var(--mono); font-size: 9px; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--amber); background: var(--amber-dim); border-radius: 3px; padding: 2px 6px; flex-shrink: 0;
+  }
+  .curated-age {
+    font-family: var(--mono); font-size: 9.5px; color: var(--text-faint); white-space: nowrap;
+  }
+  .curated-age.stale { color: var(--red); }
+  .curated-card-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; line-height: 1.3; }
+  .curated-card-company { font-size: 11.5px; color: var(--text-dim); margin-bottom: 4px; }
+  .curated-card-meta { font-family: var(--mono); font-size: 10px; color: var(--text-faint); }
+
   .nav-rail { background: var(--rail); border-right: 1px solid var(--line); overflow-y: auto; padding: 10px 0; }
   .nav-item {
     display: flex; align-items: center; gap: 10px; padding: 9px 16px; cursor: pointer;
@@ -117,7 +223,8 @@
   .checked-btn:hover { border-color: var(--text-dim); }
   .checked-btn.done { color: var(--green); border-color: var(--green); }
 
-  .pane-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; align-items: start; }
+  .pane-row { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 18px; align-items: start; }
+  .pane-body .posting-desc { max-width: 720px; }
   .pane {
     background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
   }
@@ -128,8 +235,12 @@
   .pane-head-label {
     font-family: var(--mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-dim);
   }
-  .pane-head-label.curated { color: var(--amber); }
   .pane-head-label.live { color: var(--teal); }
+  .context-note {
+    font-family: var(--mono); font-size: 11.5px; color: var(--text-dim); line-height: 1.6;
+    border-left: 2px solid var(--amber-dim); padding: 8px 12px; margin-top: 12px;
+    background: var(--panel); border-radius: 0 6px 6px 0; max-width: 640px;
+  }
   .pane-body { padding: 12px 14px; min-height: 90px; }
   .pane-empty { font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); line-height: 1.6; padding: 6px 2px; }
 
@@ -228,12 +339,27 @@
       <span class="api-status" id="apiStatus">Checking connection…</span>
       <button class="tb-btn" id="fetchLiveBtn">🔄 Refresh Live</button>
       <button class="tb-btn" id="checkAllBtn">⚡ Check All Boards</button>
+      <button class="tb-btn scout" id="openScoutBtn">💬 Ask the Scout</button>
       <button class="tb-btn primary" id="copyPromptBtn">📋 Copy Refresh Request</button>
       <div class="topbar-clock">
         <div class="live"><span class="live-dot"></span>ACTIVE</div>
         <div id="clockTime">--:--:--</div>
       </div>
     </div>
+  </div>
+
+
+  <div class="curated-strip">
+    <div class="curated-strip-head">
+      <div>
+        <div class="curated-strip-title"><span class="amber-dot"></span>Curated Picks<span class="curated-strip-sub" id="curatedSub">Hand-researched postings — click a card to jump to that lane</span></div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button class="curated-collapse-btn" id="curatedToggleBtn">– Collapse</button>
+        <button class="tb-btn" id="refreshCuratedBtn">🔎 Search for New Postings</button>
+      </div>
+    </div>
+    <div class="curated-cards" id="curatedCards"></div>
   </div>
 
   <div class="nav-rail" id="navRail"></div>
@@ -259,6 +385,27 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="scout-backdrop" id="scoutBackdrop">
+  <div class="scout-modal">
+    <div class="scout-modal-head">
+      <div>
+        <div class="scout-modal-title"><span class="teal-dot"></span>Ask the Scout</div>
+        <div class="scout-modal-sub" id="scoutModalSub">Ready — full background loaded</div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button class="scout-close-btn" id="scoutClearBtn">Clear</button>
+        <button class="scout-close-btn" id="scoutCloseBtn">✕ Close</button>
+      </div>
+    </div>
+    <div class="scout-msgs" id="scoutMsgs"></div>
+    <div class="scout-quick-row" id="scoutQuickRow"></div>
+    <div class="scout-input-row">
+      <textarea id="scoutInput" placeholder="Ask about a pivot, a skill combination, or paste a posting to check fit…" rows="1"></textarea>
+      <button class="scout-send-btn" id="scoutSendBtn">Ask →</button>
+    </div>
+  </div>
+</div>
 
 <script>
   const LANES = [{"num": 1, "id": "noc", "title": "NOC / IT Support / Systems", "sub": "Your strongest lane — 8 years NG911 infrastructure, NOC ops", "postings": [{"title": "NOC Technician", "company": "Granite Telecommunications — Quincy, MA", "meta": "~$50K–$69K (Glassdoor est.) · On-site", "url": "https://www.glassdoor.com/job-listing/noc-technician-granite-telecommunications-JV_IC1154667_KO0,14_KE15,41.htm?jl=1009919712219", "desc": "Monitors and troubleshoots client network infrastructure, manages a ticket queue, and works across SD-WAN, firewalls, and enterprise networking. CCNA or Network+ called out directly as qualifying certs. <b style=\"color:var(--red)\">Below your $80K target</b> — worth checking if it's a stepping stone toward their Cloud Ops / Senior roles."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=NOC+engineer&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=NOC%20Engineer&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=NOC+Engineer&location=Boston%2C+MA", "label": "ZipRecruiter"}, {"url": "https://www.simplyhired.com/search?q=noc+engineer&l=massachusetts", "label": "SimplyHired"}, {"url": "https://www.glassdoor.com/Job/jobs.htm?sc.keyword=NOC+engineer&locT=S&locId=1154532", "label": "Glassdoor"}], "filterNote": "Try also: \"network operations\", \"systems administrator\" — widen if results are thin."}, {"num": 2, "id": "field", "title": "Field Service Engineer", "sub": "Medical device / regulated equipment — direct match to Zeiss work", "postings": [{"title": "Field Service Engineer II (Medical Devices)", "company": "Boston Scientific — Boston, MA", "meta": "~$77K–$104K (market est.) · Northeast region travel", "url": "https://jobs.bostonscientific.com/job/Boston-Field-Service-Engineer-II-(Medical-Devices)-Boston,-MA-MA-02101/1405621600/", "desc": "Supports Cardiovascular Division products (IVUS, AngioJet, FARAPULSE, and similar systems) across the Northeast. Requires an Associate's degree/technical diploma plus 1 year experience — <b style=\"color:var(--green)\">or an equivalent combination of training and work experience</b>, which directly fits your background."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=field+service+engineer+medical+device&l=Massachusetts", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=Field%20Service%20Engineer%20Medical%20Device&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Field-Service-Engineer/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://jobs.bostonscientific.com/search/?q=field+service", "label": "Boston Scientific"}, {"url": "https://www.glassdoor.com/Job/massachusetts-field-service-engineer-jobs-SRCH_IL.0,13_IS3399_KO14,36.htm", "label": "Glassdoor"}], "filterNote": "Also check GE HealthCare, Philips, Siemens Healthineers, Canon Medical career pages directly."}, {"num": 3, "id": "cyber", "title": "Cybersecurity / SOC Analyst", "sub": "Apply Tier 1 / Associate level — matches your BCS 365 experience", "postings": [{"title": "Cybersecurity Analyst / SOC Analyst (multiple levels)", "company": "State Street — Quincy, MA", "meta": "~$80K–$120K (market est.) · Hybrid", "url": "https://www.glassdoor.com/Job/boston-soc-analyst-jobs-SRCH_IL.0,6_IC1154532_KO7,18.htm", "desc": "State Street's Fusion Center runs 24/7 threat detection and response; they post multiple SOC tiers regularly. <b style=\"color:var(--amber)\">Filter for \"Cybersecurity Analyst\" or entry associate-level</b> — the Lead/Senior postings want 4+ years dedicated SOC/IR experience, above your current level."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=SOC+analyst&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=SOC%20Analyst%20Tier%201&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Soc-Analyst-Tier-1/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://www.glassdoor.com/Job/boston-entry-level-cyber-security-jobs-SRCH_IL.0,6_IC1154532_KO7,33.htm", "label": "Glassdoor"}], "filterNote": "Search \"Tier 1\" or \"Associate\" explicitly — avoids senior-level mismatches."}, {"num": 4, "id": "e911", "title": "E911 / NG911 Niche", "sub": "Specialized — thin but high-fit when it hits", "postings": [], "snapshot": "Nothing matching your Technical/IT profile is currently open on NENA/MassNENA — this lane is link-only until something posts. Check back regularly; it moves in bursts.", "feeds": [{"url": "https://www.ziprecruiter.com/Jobs/E911-Engineer", "label": "ZipRecruiter (E911)"}, {"url": "https://www.indeed.com/q-Ng911-jobs.html", "label": "Indeed (NG911)"}, {"url": "https://jobs.nena.org/jobs/state/massachusetts/", "label": "NENA board"}, {"url": "https://www.massnena.org/jobs-1-1", "label": "MassNENA"}, {"url": "https://www.everbridge.com/about/careers/", "label": "Everbridge (Burlington, MA)"}, {"url": "https://www.indeed.com/q-motorola-solutions-l-massachusetts-jobs.html", "label": "Motorola Solutions"}], "filterNote": "Lead with named product experience (Motorola CallWorks, OMON) in any application here."}, {"num": 5, "id": "desktop", "title": "Desktop Support / End User Support", "sub": "Direct match — six roles on your resume touch this exact work", "postings": [{"title": "End User Support Specialist", "company": "Barings — Boston, MA", "meta": "$85,900–$137,500 (posted range) · On-site/Hybrid", "url": "https://www.simplyhired.com/search?q=desktop+support+specialist&l=boston,+ma", "desc": "First and second-line support for end users, resolving technical issues and maintaining high service standards — direct overlap with your Rue La La and Harvard SPH experience. Link goes to the search result; open it and look for the Barings listing specifically since direct-apply links go stale fast on aggregators."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=desktop+support&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=Desktop%20Support&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Desktop-Support/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://www.glassdoor.com/Job/boston-desktop-support-jobs-SRCH_IL.0,6_IC1154532_KO7,22.htm", "label": "Glassdoor"}], "filterNote": "Watch pay carefully in this lane — many desktop support postings run $50K–$70K; filter for \"End User Support,\" \"IT Support Engineer,\" or \"Senior\" to stay near your target."}, {"num": 6, "id": "ngo", "title": "UN / NGO / International", "sub": "Honest flag: most open roles are field-based, local-salary, or need prior INGO experience", "postings": [], "snapshot": "Checked ReliefWeb/UNjobs directly — current ICT/IT Support postings are based in Ethiopia, Kenya, Syria, Philippines, etc., paying local rates well under $80K USD-equivalent, or explicitly require prior NGO/INGO field experience. No US-based, $80K+ match right now. Worth checking periodically — this shifts often — but don't expect this lane to move as fast as the others.", "feeds": [{"url": "https://careers.un.org/jobopening", "label": "UN Careers portal"}, {"url": "https://reliefweb.int/jobs", "label": "ReliefWeb Jobs"}, {"url": "https://www.impactpool.org/jobs/c/remote-ngo-jobs", "label": "Impactpool (remote NGO)"}, {"url": "https://unjobs.org/skills/ict", "label": "UNjobs.org (ICT filter)"}], "filterNote": "Filter ReliefWeb/UNjobs by country = United States for any chance at a US-based salary. Field Service (GS) category roles are your best formal fit — see earlier conversation on the nationality restriction for Haiti-based posts specifically."}, {"num": 7, "id": "mdcs", "title": "Medical Device Cybersecurity / HTM", "sub": "Combines your Zeiss field service + BCS 365 security background — narrow niche, structural workforce shortage, low competition", "postings": [{"title": "BMET Cybersecurity Specialist", "company": "Sodexo (Healthcare Technology Management Division) — MA hospital clients", "meta": "Sodexo rotates this exact title across client hospitals nationally (had a Hyannis, MA / Boston-hospital posting) · check their careers page directly, not just aggregators", "url": "https://www.indeed.com/q-medical-device-cybersecurity-l-massachusetts-jobs.html", "desc": "Lead the collection of cybersecurity data in CMMS, conduct device risk assessments, manage vulnerability remediation/patching, and coordinate with hospital IT and device vendors. Your Zeiss change-control/audit-trail work and BCS 365 Sentinel/CrowdStrike/Qualys experience map directly onto this. <b style=\"color:var(--red)\">CySA+ not required</b> — Security+ plus hands-on device experience is enough to be competitive now."}], "snapshot": "Snapshot pulled Aug 20, 2026 — narrow niche; expect a handful of active MA postings at a time, not a high-volume lane. Also watch GE Healthcare, Philips, Siemens Healthineers, and TRIMEDX directly — the other major HTM/device-service contractors that staff this role.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=medical%20device%20cybersecurity&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-BMET-cybersecurity-jobs.html", "label": "Indeed: BMET cybersecurity (national — rotates through MA)"}, {"url": "https://www.himss.org/jobs", "label": "HIMSS Job Mine"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=medical+device+cybersecurity&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Try also: \"healthcare IoT security\", \"clinical engineering cybersecurity\". Widen location to New England if MA results are thin — this lane moves in bursts."}, {"num": 8, "id": "bmet", "title": "BMET / Clinical Engineering", "sub": "CBET certification path — formalizes your Zeiss device work; 30+ BMET programs closed in 5 years, only ~400 grads/yr vs ~7,300 annual openings", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet. Structural shortage means this is worth checking regularly even without a live hit.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=biomedical%20equipment%20technician&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-biomedical-equipment-technician-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.aami.org/careers/job-board", "label": "AAMI Job Board"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=BMET&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Lead with Zeiss CIRRUS OCT/HFA experience and FDA-regulated change-control work. Consider a BMET associate/certificate program (cuts CBET experience requirement from 4 years to 2)."}, {"num": 9, "id": "healthit", "title": "Healthcare IT / Epic Systems Analyst", "sub": "BLS: 15% growth 2024–2034 — \"much faster than average\"; median $107K, often employer-sponsored Epic cert", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=healthcare%20IT%20analyst&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-healthcare-it-analyst-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.himss.org/jobs", "label": "HIMSS Job Mine"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=Epic+analyst&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Employers frequently sponsor Epic certification after hire — don't screen yourself out for not having it yet."}, {"num": 10, "id": "cloudsec", "title": "Cloud Security Engineer", "sub": "Reactivates your Azure Fundamentals/AZ-500 background — highest ceiling of any lane ($130K–$225K)", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=cloud%20security%20engineer&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-cloud-security-engineer-l-boston,-ma-jobs.html", "label": "Indeed"}, {"url": "https://jobs.isc2.org/", "label": "ISC2 Job Board"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=cloud+security+engineer&location=Boston%2C+MA", "label": "ZipRecruiter"}], "filterNote": "Reactivate AZ-500 and finish CySA+ first — the credential pairing is what unlocks this lane's top end."}, {"num": 11, "id": "clinapp", "title": "Clinical Applications / Medical Device Specialist", "sub": "Closest lateral move from OCT field work — device fluency + client-facing training, not repair. $89K–$148K", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet. Weakest fit of the new lanes if outbound sales is involved — screen postings for base-heavy vs. commission-heavy comp before applying.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=clinical%20applications%20specialist&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-clinical-applications-specialist-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=clinical+specialist+medical+device&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Combines Clinical Applications Specialist and Medical Device Sales/Clinical Specialist — same buyer, same skill set, different comp structure per employer."}, {"num": 12, "id": "netqeng", "title": "Network Engineer", "sub": "Fastest to reactivate (CCNA refresh) — moderate ceiling ($90K–$110K), good fallback while pursuing higher-leverage lanes", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=network%20engineer&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-network-engineer-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=network+engineer&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Refresh CCNA — shortest path back into a paying role while longer-lead lanes (Cloud Security, Healthcare IT) develop."}]
@@ -300,12 +447,11 @@
     const live = liveData[lane.id];
     const el = document.getElementById('mainPane');
 
-    const curatedHtml = lane.postings.length
-      ? lane.postings.map(p => postingCardHtml(p, lane.id, false)).join('')
-      : `<div class="pane-empty">${escapeHtml(lane.snapshot || 'No curated posting on file for this lane yet.')}</div>`;
-
-    const curatedFooter = lane.postings.length && lane.snapshot
-      ? `<div class="pane-empty" style="margin-top:4px; border-top:1px solid var(--line); padding-top:8px;">${escapeHtml(lane.snapshot)}</div>` : '';
+    // Context note: only shown when there's no live-postings fallback needed —
+    // i.e. lanes where research never turned up a confirmed opening, so this
+    // is evergreen analysis (not a stale posting standing in as if current).
+    const contextNote = (!lane.postings.length && lane.snapshot)
+      ? `<div class="context-note">${escapeHtml(lane.snapshot)}</div>` : '';
 
     let liveHtml;
     if (!live) {
@@ -333,12 +479,9 @@
           </div>
           <button class="checked-btn" id="checkedBtn" data-check="${lane.id}">Mark checked today</button>
         </div>
+        ${contextNote}
       </div>
       <div class="pane-row">
-        <div class="pane">
-          <div class="pane-head"><span class="pane-head-label curated">Curated Snapshot</span></div>
-          <div class="pane-body">${curatedHtml}${curatedFooter}</div>
-        </div>
         <div class="pane">
           <div class="pane-head"><span class="pane-head-label live">Live — Adzuna</span></div>
           <div class="pane-body" id="livePaneBody">${liveHtml}</div>
@@ -457,11 +600,11 @@
   // ===== Mark checked (per lane) =====
   const LANE_KEY = 'lane-checked-v1';
   async function loadLaneChecks() {
-    try { const res = await window.storage.get(LANE_KEY, false); return res && res.value ? JSON.parse(res.value) : {}; }
+    try { const raw = localStorage.getItem(LANE_KEY); return raw ? JSON.parse(raw) : {}; }
     catch (e) { return {}; }
   }
   async function saveLaneChecks(data) {
-    try { await window.storage.set(LANE_KEY, JSON.stringify(data), false); } catch (e) {}
+    try { localStorage.setItem(LANE_KEY, JSON.stringify(data)); } catch (e) {}
   }
   function renderCheckedBtn(laneId) {
     loadLaneChecks().then(checks => {
@@ -488,12 +631,12 @@
     return l ? l.title.split(' / ')[0].split(' (')[0] : id;
   }
   async function loadLeads() {
-    try { const res = await window.storage.get(LEADS_KEY, false); leads = res && res.value ? JSON.parse(res.value) : []; }
+    try { const raw = localStorage.getItem(LEADS_KEY); leads = raw ? JSON.parse(raw) : []; }
     catch (e) { leads = []; }
     renderLeads();
   }
   async function persistLeads() {
-    try { await window.storage.set(LEADS_KEY, JSON.stringify(leads), false); } catch (e) {}
+    try { localStorage.setItem(LEADS_KEY, JSON.stringify(leads)); } catch (e) {}
   }
   function renderLeads(flashIdx) {
     const el = document.getElementById('leadsList');
@@ -555,6 +698,7 @@
 
   // ===== Keyboard nav =====
   document.addEventListener('keydown', (e) => {
+    if (document.getElementById('scoutBackdrop').classList.contains('open')) return;
     const tag = (document.activeElement.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
     const idx = LANES.findIndex(l => l.id === activeLane);
@@ -565,12 +709,293 @@
   function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str || ''; return d.innerHTML; }
   function escapeAttr(str) { return (str || '').replace(/"/g, '&quot;'); }
 
+
+  const CURATED_DEFAULT = [{"laneId": "noc", "laneTitle": "NOC", "title": "NOC Technician", "company": "Granite Telecommunications — Quincy, MA", "meta": "~$50K–$69K (Glassdoor est.) · On-site", "url": "https://www.glassdoor.com/job-listing/noc-technician-granite-telecommunications-JV_IC1154667_KO0,14_KE15,41.htm?jl=1009919712219", "desc": "Monitors and troubleshoots client network infrastructure, manages a ticket queue, and works across SD-WAN, firewalls, and enterprise networking. CCNA or Network+ called out directly as qualifying certs. <b style=\"color:var(--red)\">Below your $80K target</b> — worth checking if it's a stepping stone toward their Cloud Ops / Senior roles.", "postedDate": "Aug 19, 2026"}, {"laneId": "field", "laneTitle": "Field Service Engineer", "title": "Field Service Engineer II (Medical Devices)", "company": "Boston Scientific — Boston, MA", "meta": "~$77K–$104K (market est.) · Northeast region travel", "url": "https://jobs.bostonscientific.com/job/Boston-Field-Service-Engineer-II-(Medical-Devices)-Boston,-MA-MA-02101/1405621600/", "desc": "Supports Cardiovascular Division products (IVUS, AngioJet, FARAPULSE, and similar systems) across the Northeast. Requires an Associate's degree/technical diploma plus 1 year experience — <b style=\"color:var(--green)\">or an equivalent combination of training and work experience</b>, which directly fits your background.", "postedDate": "Aug 19, 2026"}, {"laneId": "cyber", "laneTitle": "Cybersecurity", "title": "Cybersecurity Analyst / SOC Analyst (multiple levels)", "company": "State Street — Quincy, MA", "meta": "~$80K–$120K (market est.) · Hybrid", "url": "https://www.glassdoor.com/Job/boston-soc-analyst-jobs-SRCH_IL.0,6_IC1154532_KO7,18.htm", "desc": "State Street's Fusion Center runs 24/7 threat detection and response; they post multiple SOC tiers regularly. <b style=\"color:var(--amber)\">Filter for \"Cybersecurity Analyst\" or entry associate-level</b> — the Lead/Senior postings want 4+ years dedicated SOC/IR experience, above your current level.", "postedDate": "Aug 19, 2026"}, {"laneId": "desktop", "laneTitle": "Desktop Support", "title": "End User Support Specialist", "company": "Barings — Boston, MA", "meta": "$85,900–$137,500 (posted range) · On-site/Hybrid", "url": "https://www.simplyhired.com/search?q=desktop+support+specialist&l=boston,+ma", "desc": "First and second-line support for end users, resolving technical issues and maintaining high service standards — direct overlap with your Rue La La and Harvard SPH experience. Link goes to the search result; open it and look for the Barings listing specifically since direct-apply links go stale fast on aggregators.", "postedDate": "Aug 19, 2026"}, {"laneId": "mdcs", "laneTitle": "Medical Device Cybersecurity", "title": "BMET Cybersecurity Specialist", "company": "Sodexo (Healthcare Technology Management Division) — MA hospital clients", "meta": "Sodexo rotates this exact title across client hospitals nationally (had a Hyannis, MA / Boston-hospital posting) · check their careers page directly, not just aggregators", "url": "https://www.indeed.com/q-medical-device-cybersecurity-l-massachusetts-jobs.html", "desc": "Lead the collection of cybersecurity data in CMMS, conduct device risk assessments, manage vulnerability remediation/patching, and coordinate with hospital IT and device vendors. Your Zeiss change-control/audit-trail work and BCS 365 Sentinel/CrowdStrike/Qualys experience map directly onto this. <b style=\"color:var(--red)\">CySA+ not required</b> — Security+ plus hands-on device experience is enough to be competitive now.", "postedDate": "Aug 20, 2026"}];
+  let CURATED = CURATED_DEFAULT;
+  let curatedRefreshedAt = null; // null = still showing the original hand-researched set
+
+  const LANE_ID_LIST = "noc, field, cyber, e911, desktop, ngo, mdcs, bmet, healthit, cloudsec, clinapp, netqeng";
+
+  const CURATED_KEY = 'curated-picks-v2';
+
+  async function loadCuratedFromStorage() {
+    try {
+      const raw = localStorage.getItem(CURATED_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        CURATED = parsed.items;
+        curatedRefreshedAt = parsed.refreshedAt;
+      }
+    } catch (e) { /* no saved refresh yet — keep CURATED_DEFAULT */ }
+  }
+  function persistCurated() {
+    try {
+      localStorage.setItem(CURATED_KEY, JSON.stringify({ items: CURATED, refreshedAt: curatedRefreshedAt }));
+    } catch (e) {}
+  }
+
+
+  function daysAgo(dateStr) {
+    const d = new Date(dateStr + ' 00:00:00');
+    const now = new Date();
+    return Math.round((now - d) / 86400000);
+  }
+
+  function renderCuratedStrip() {
+    const sub = document.getElementById('curatedSub');
+    if (curatedRefreshedAt) {
+      const when = new Date(curatedRefreshedAt);
+      const mins = Math.round((new Date() - when) / 60000);
+      const label = mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.round(mins/60)}h ago`;
+      sub.textContent = `Refreshed by live web search · ${label} · click a card to jump to that lane`;
+    } else {
+      sub.textContent = 'Hand-researched postings — click a card to jump to that lane, or search for current ones';
+    }
+
+    const el = document.getElementById('curatedCards');
+    el.innerHTML = CURATED.map(c => {
+      const age = c.postedDate ? daysAgo(c.postedDate) : null;
+      const ageLabel = age === null ? '' : age === 0 ? 'today' : age === 1 ? '1 day old' : `${age} days old`;
+      const stale = age !== null && age > 14;
+      return `
+        <div class="curated-card" data-jump="${c.laneId}">
+          <div class="curated-card-top">
+            <span class="curated-lane-tag">${escapeHtml(c.laneTitle)}</span>
+            <span class="curated-age ${stale ? 'stale' : ''}">${c.postedDate ? escapeHtml(c.postedDate) : ''}${ageLabel ? ' · ' + ageLabel : ''}</span>
+          </div>
+          <div class="curated-card-title">${escapeHtml(c.title)}</div>
+          <div class="curated-card-company">${escapeHtml(c.company)}</div>
+          <div class="curated-card-meta">${escapeHtml(c.meta)}</div>
+        </div>`;
+    }).join('');
+    el.querySelectorAll('[data-jump]').forEach(card => {
+      card.addEventListener('click', () => selectLane(card.getAttribute('data-jump')));
+    });
+  }
+
+  document.getElementById('curatedToggleBtn').addEventListener('click', (e) => {
+    const cards = document.getElementById('curatedCards');
+    const collapsed = cards.classList.toggle('collapsed');
+    e.target.textContent = collapsed ? '+ Expand' : '– Collapse';
+  });
+
+  document.getElementById('refreshCuratedBtn').addEventListener('click', refreshCuratedFromAI);
+
+  async function refreshCuratedFromAI() {
+    const btn = document.getElementById('refreshCuratedBtn');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '🔎 Searching…';
+    btn.style.opacity = '0.6';
+
+    try {
+      const res = await fetch('/api/scout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'postings' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      CURATED = data.items;
+      curatedRefreshedAt = data.refreshedAt;
+      persistCurated();
+      renderCuratedStrip();
+      showToast(data.fromCache
+        ? `✓ Loaded ${data.items.length} postings from cache (no new search cost — refreshed within the last 12h)`
+        : `✓ Searched live — ${data.items.length} current postings found`);
+    } catch (e) {
+      showToast(`Refresh failed: ${e.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+      btn.style.opacity = '1';
+    }
+  }
+
+  // ===== Scout Chat =====
+  const SCOUT_CHAT_KEY = 'scout-chat-v1';
+  let scoutHistory = [];
+
+  function loadScoutHistory() {
+    try { const raw = localStorage.getItem(SCOUT_CHAT_KEY); scoutHistory = raw ? JSON.parse(raw) : []; }
+    catch (e) { scoutHistory = []; }
+  }
+  function persistScoutHistory() {
+    try { localStorage.setItem(SCOUT_CHAT_KEY, JSON.stringify(scoutHistory)); } catch (e) {}
+  }
+
+  function renderScoutMd(text) {
+    return text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>[\s\S]*?<\/li>)/g, m => `<ul>${m}</ul>`)
+      .replace(/\n\n+/g, '</p><p>')
+      .replace(/\n/g, '<br>')
+      .replace(/^([^<].+)$/gm, s => s ? `<p>${s}</p>` : s);
+  }
+
+  function renderScoutMsgs() {
+    const el = document.getElementById('scoutMsgs');
+    if (!scoutHistory.length) {
+      el.innerHTML = `<div class="scout-msg-bot">
+        <div class="scout-msg-bot-label">✦ SCOUT</div>
+        <div class="scout-msg-bot-body"><p>Ask me anything about a career pivot, a skill combination across your lanes, or paste in a posting to check fit — I've got your full background and can search the web for current info.</p></div>
+      </div>`;
+      return;
+    }
+    el.innerHTML = scoutHistory.map(m => {
+      if (m.role === 'user') return `<div class="scout-msg-user"><div class="scout-msg-user-body">${escapeHtml(m.content)}</div></div>`;
+      return `<div class="scout-msg-bot">
+        <div class="scout-msg-bot-label">✦ SCOUT</div>
+        <div class="scout-msg-bot-body">${renderScoutMd(m.content)}</div>
+      </div>`;
+    }).join('');
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function renderScoutQuickChips() {
+    const chips = [
+      "What combines my field service and languages?",
+      "Is there demand for this outside Massachusetts?",
+      "What's the fastest one to actually land?",
+    ];
+    document.getElementById('scoutQuickRow').innerHTML =
+      `<div class="scout-chip" id="scoutFindPostingsChip" style="border-color:var(--amber-dim); color:var(--amber);">🔎 Find current postings</div>` +
+      chips.map(c => `<div class="scout-chip">${escapeHtml(c)}</div>`).join('');
+    document.querySelectorAll('.scout-chip').forEach(chip => {
+      if (chip.id === 'scoutFindPostingsChip') return; // wired separately below
+      chip.addEventListener('click', () => sendScoutMessage(chip.textContent));
+    });
+    document.getElementById('scoutFindPostingsChip').addEventListener('click', findPostingsFromChat);
+  }
+
+  async function findPostingsFromChat() {
+    document.getElementById('scoutModalSub').textContent = 'Searching for postings…';
+    const el = document.getElementById('scoutMsgs');
+    scoutHistory.push({ role: 'user', content: 'Find current postings' });
+    renderScoutMsgs();
+    const thinkId = 'scout-think-' + Date.now();
+    el.insertAdjacentHTML('beforeend', `
+      <div class="scout-msg-bot" id="${thinkId}">
+        <div class="scout-msg-bot-label">✦ SCOUT</div>
+        <div class="scout-msg-bot-body"><div class="scout-thinking"><span></span><span></span><span></span></div></div>
+      </div>`);
+    el.scrollTop = el.scrollHeight;
+
+    try {
+      const res = await fetch('/api/scout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'postings' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      CURATED = data.items;
+      curatedRefreshedAt = data.refreshedAt;
+      persistCurated();
+      renderCuratedStrip();
+
+      const summary = data.fromCache
+        ? `Pulled ${data.items.length} postings from the cache (searched within the last 12h, no new cost) — updated the **Curated Picks** strip above. Titles: ${data.items.map(i => i.title).join(', ')}.`
+        : `Searched live and found ${data.items.length} current postings — updated the **Curated Picks** strip above. Titles: ${data.items.map(i => i.title).join(', ')}.`;
+      scoutHistory.push({ role: 'assistant', content: summary });
+      persistScoutHistory();
+      renderScoutMsgs();
+      document.getElementById('scoutModalSub').textContent = 'Ready — full background loaded';
+    } catch (e) {
+      document.getElementById(thinkId).outerHTML = `
+        <div class="scout-msg-bot">
+          <div class="scout-msg-bot-label">✦ SCOUT</div>
+          <div class="scout-msg-bot-body"><p style="color:var(--red)">Search failed: ${escapeHtml(e.message)}</p></div>
+        </div>`;
+      document.getElementById('scoutModalSub').textContent = 'Error — try again';
+    }
+  }
+
+  async function sendScoutMessage(text) {
+    const msg = (text || document.getElementById('scoutInput').value || '').trim();
+    if (!msg) return;
+    document.getElementById('scoutInput').value = '';
+    document.getElementById('scoutSendBtn').disabled = true;
+    document.getElementById('scoutModalSub').textContent = 'Thinking…';
+
+    scoutHistory.push({ role: 'user', content: msg });
+    renderScoutMsgs();
+
+    const el = document.getElementById('scoutMsgs');
+    const thinkId = 'scout-think-' + Date.now();
+    el.insertAdjacentHTML('beforeend', `
+      <div class="scout-msg-bot" id="${thinkId}">
+        <div class="scout-msg-bot-label">✦ SCOUT</div>
+        <div class="scout-msg-bot-body"><div class="scout-thinking"><span></span><span></span><span></span></div></div>
+      </div>`);
+    el.scrollTop = el.scrollHeight;
+
+    try {
+      const res = await fetch('/api/scout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'chat', messages: scoutHistory }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      scoutHistory.push({ role: 'assistant', content: data.reply });
+      persistScoutHistory();
+      renderScoutMsgs();
+      document.getElementById('scoutModalSub').textContent = 'Ready — full background loaded';
+    } catch (e) {
+      document.getElementById(thinkId).outerHTML = `
+        <div class="scout-msg-bot">
+          <div class="scout-msg-bot-label">✦ SCOUT</div>
+          <div class="scout-msg-bot-body"><p style="color:var(--red)">Couldn't reach the model: ${escapeHtml(e.message)}</p></div>
+        </div>`;
+      document.getElementById('scoutModalSub').textContent = 'Error — try again';
+    }
+    document.getElementById('scoutSendBtn').disabled = false;
+  }
+
+  document.getElementById('openScoutBtn').addEventListener('click', () => {
+    document.getElementById('scoutBackdrop').classList.add('open');
+    document.getElementById('scoutInput').focus();
+  });
+  document.getElementById('scoutCloseBtn').addEventListener('click', () => {
+    document.getElementById('scoutBackdrop').classList.remove('open');
+  });
+  document.getElementById('scoutBackdrop').addEventListener('click', (e) => {
+    if (e.target.id === 'scoutBackdrop') document.getElementById('scoutBackdrop').classList.remove('open');
+  });
+  document.getElementById('scoutClearBtn').addEventListener('click', () => {
+    scoutHistory = [];
+    persistScoutHistory();
+    renderScoutMsgs();
+  });
+  document.getElementById('scoutSendBtn').addEventListener('click', () => sendScoutMessage());
+  document.getElementById('scoutInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendScoutMessage(); }
+  });
+  document.getElementById('scoutInput').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.getElementById('scoutBackdrop').classList.remove('open');
+  });
+
+  loadScoutHistory();
+  renderScoutMsgs();
+  renderScoutQuickChips();
+
   // ===== Init =====
   initLaneSelect();
   renderNav();
   renderMain();
   updateNavChecks();
   loadLeads();
+  loadCuratedFromStorage().then(renderCuratedStrip);
 </script>
 </body>
 </html>
