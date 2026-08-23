@@ -38,57 +38,57 @@ app.get('/', (req, res) => {
 const LANES = {
   noc: {
     label: 'NOC / IT Support',
-    what: 'NOC engineer OR network operations',
+    what: ['NOC engineer', 'network operations'],
     where: 'Boston MA',
   },
   field: {
     label: 'Field Service Engineer',
-    what: 'field service engineer medical device',
+    what: ['field service engineer medical device'],
     where: 'Massachusetts',
   },
   cyber: {
     label: 'Cybersecurity / SOC Analyst',
-    what: 'SOC analyst OR cybersecurity analyst',
+    what: ['SOC analyst', 'cybersecurity analyst'],
     where: 'Boston MA',
   },
   e911: {
     label: 'E911 / NG911',
-    what: 'E911 engineer OR NG911',
+    what: ['E911 engineer', 'NG911'],
     where: 'Massachusetts',
   },
   desktop: {
     label: 'Desktop Support',
-    what: 'desktop support OR end user support specialist',
+    what: ['desktop support', 'end user support specialist'],
     where: 'Boston MA',
   },
   mdcs: {
     label: 'Medical Device Cybersecurity / HTM',
-    what: 'medical device cybersecurity OR BMET cybersecurity OR healthcare technology management security',
+    what: ['medical device cybersecurity', 'BMET cybersecurity', 'healthcare technology management security'],
     where: 'Massachusetts',
   },
   bmet: {
     label: 'BMET / Clinical Engineering',
-    what: 'biomedical equipment technician OR BMET OR clinical engineer',
+    what: ['biomedical equipment technician', 'BMET', 'clinical engineer'],
     where: 'Massachusetts',
   },
   healthit: {
     label: 'Healthcare IT / Epic Systems Analyst',
-    what: 'Epic analyst OR healthcare IT analyst OR clinical systems analyst',
+    what: ['Epic analyst', 'healthcare IT analyst', 'clinical systems analyst'],
     where: 'Massachusetts',
   },
   cloudsec: {
     label: 'Cloud Security Engineer',
-    what: 'cloud security engineer OR Azure security engineer',
+    what: ['cloud security engineer', 'Azure security engineer'],
     where: 'Boston MA',
   },
   clinapp: {
     label: 'Clinical Applications / Medical Device Specialist',
-    what: 'clinical applications specialist OR medical device clinical specialist',
+    what: ['clinical applications specialist', 'medical device clinical specialist'],
     where: 'Massachusetts',
   },
   netqeng: {
     label: 'Network Engineer',
-    what: 'network engineer',
+    what: ['network engineer'],
     where: 'Massachusetts',
   },
   // Note: UN/NGO roles deliberately not included here — Adzuna's /us/ endpoint
@@ -101,18 +101,12 @@ const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours — keeps Adzuna calls low o
 // In-memory cache: { [lane]: { fetchedAt, jobs: [...] } }
 const cache = {};
 
-async function fetchLaneFromAdzuna(laneKey) {
-  const lane = LANES[laneKey];
-  if (!lane) throw new Error(`Unknown lane: ${laneKey}`);
-  if (!APP_ID || !APP_KEY) {
-    throw new Error('ADZUNA_APP_ID / ADZUNA_APP_KEY not set in environment variables');
-  }
-
+async function fetchOnePhrase(phrase, where) {
   const url = new URL(`https://api.adzuna.com/v1/api/jobs/us/search/1`);
   url.searchParams.set('app_id', APP_ID);
   url.searchParams.set('app_key', APP_KEY);
-  url.searchParams.set('what', lane.what);
-  url.searchParams.set('where', lane.where);
+  url.searchParams.set('what', phrase);
+  url.searchParams.set('where', where);
   url.searchParams.set('results_per_page', '20');
   url.searchParams.set('sort_by', 'date');
   url.searchParams.set('content-type', 'application/json');
@@ -123,8 +117,7 @@ async function fetchLaneFromAdzuna(laneKey) {
     throw new Error(`Adzuna API error ${res.status}: ${text.slice(0, 300)}`);
   }
   const data = await res.json();
-
-  const jobs = (data.results || []).map(j => ({
+  return (data.results || []).map(j => ({
     id: j.id,
     title: j.title,
     company: j.company && j.company.display_name,
@@ -135,8 +128,33 @@ async function fetchLaneFromAdzuna(laneKey) {
     url: j.redirect_url,
     description: (j.description || '').slice(0, 280),
   }));
+}
 
-  return jobs;
+// Adzuna's `what` param does a plain keyword/phrase match — it has no
+// boolean OR support, so a lane with multiple alternative search phrases
+// (e.g. "NOC engineer" vs "network operations") needs one real request per
+// phrase. Results are merged and deduped by posting id, then capped at 20.
+async function fetchLaneFromAdzuna(laneKey) {
+  const lane = LANES[laneKey];
+  if (!lane) throw new Error(`Unknown lane: ${laneKey}`);
+  if (!APP_ID || !APP_KEY) {
+    throw new Error('ADZUNA_APP_ID / ADZUNA_APP_KEY not set in environment variables');
+  }
+
+  const phrases = Array.isArray(lane.what) ? lane.what : [lane.what];
+  const results = await Promise.all(phrases.map(p => fetchOnePhrase(p, lane.where)));
+
+  const seen = new Set();
+  const merged = [];
+  for (const jobs of results) {
+    for (const job of jobs) {
+      if (seen.has(job.id)) continue;
+      seen.add(job.id);
+      merged.push(job);
+    }
+  }
+  merged.sort((a, b) => new Date(b.created) - new Date(a.created));
+  return merged.slice(0, 20);
 }
 
 async function getLane(laneKey, forceRefresh = false) {
