@@ -1,298 +1,895 @@
-// job-board-api/server.js
-//
-// Small backend for the personal job search dashboard.
-// Fetches postings from the Adzuna Jobs API (legitimate, ToS-compliant
-// job aggregator with a free tier) and caches results in memory so the
-// dashboard gets instant responses without hammering Adzuna's rate limit.
-//
-// Env vars required (set these in Railway's dashboard, never commit them):
-//   ADZUNA_APP_ID   - from https://developer.adzuna.com/
-//   ADZUNA_APP_KEY  - from https://developer.adzuna.com/
-//   PORT            - Railway sets this automatically, no action needed
-//   ALLOWED_ORIGIN  - optional, restrict CORS to your dashboard's origin
-//                      (leave unset to allow any origin, fine for personal use)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ops Board — Job Search</title>
+<style>
+  :root {
+    --bg: #10141a;
+    --panel: #161b23;
+    --panel-2: #1c222c;
+    --line: #2a323e;
+    --text: #e7e9ea;
+    --text-dim: #8b96a5;
+    --amber: #e8a33d;
+    --teal: #4fb8ae;
+    --red: #d9695f;
+    --green: #6ec97f;
+    --mono: ui-monospace, "SFMono-Regular", "IBM Plex Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", "IBM Plex Sans", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    padding: 24px 20px 60px;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 980px; margin: 0 auto; }
 
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const fetch = require('node-fetch');
-const path = require('path');
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .title-block .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--amber);
+    text-transform: uppercase;
+  }
+  .title-block h1 {
+    margin: 4px 0 0;
+    font-size: 26px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+  .clock {
+    font-family: var(--mono);
+    text-align: right;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .clock .live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--green);
+    font-weight: 600;
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-const APP_ID = process.env.ADZUNA_APP_ID;
-const APP_KEY = process.env.ADZUNA_APP_KEY;
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
+  .brief {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text-dim);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--teal);
+    padding: 12px 14px;
+    border-radius: 4px;
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+  .brief b { color: var(--text); }
 
-app.use(cors({ origin: ALLOWED_ORIGIN }));
-app.use(express.json());
+  /* Channels */
+  .channel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .channel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .channel-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .channel-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--bg);
+    background: var(--amber);
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 700;
+  }
+  .channel-name h2 { font-size: 15px; margin: 0; font-weight: 650; }
+  .channel-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
 
-// Serve the dashboard directly from the repo root — matches this repo's
-// flat file layout (index.html sits alongside server.js, no /public subfolder).
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+  .checked-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 5px 9px;
+    cursor: pointer;
+  }
+  .checked-btn:hover { border-color: var(--teal); color: var(--teal); }
+  .checked-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
-// ---- Lane definitions: edit these anytime to tune your search terms ----
-const LANES = {
-  noc: {
-    label: 'NOC / IT Support',
-    what: 'NOC engineer OR network operations',
-    where: 'Boston MA',
-  },
-  field: {
-    label: 'Field Service Engineer',
-    what: 'field service engineer medical device',
-    where: 'Massachusetts',
-  },
-  cyber: {
-    label: 'Cybersecurity / SOC Analyst',
-    what: 'SOC analyst OR cybersecurity analyst',
-    where: 'Boston MA',
-  },
-  e911: {
-    label: 'E911 / NG911',
-    what: 'E911 engineer OR NG911',
-    where: 'Massachusetts',
-  },
-  desktop: {
-    label: 'Desktop Support',
-    what: 'desktop support OR end user support specialist',
-    where: 'Boston MA',
-  },
-  mdcs: {
-    label: 'Medical Device Cybersecurity / HTM',
-    what: 'medical device cybersecurity OR BMET cybersecurity OR healthcare technology management security',
-    where: 'Massachusetts',
-  },
-  bmet: {
-    label: 'BMET / Clinical Engineering',
-    what: 'biomedical equipment technician OR BMET OR clinical engineer',
-    where: 'Massachusetts',
-  },
-  healthit: {
-    label: 'Healthcare IT / Epic Systems Analyst',
-    what: 'Epic analyst OR healthcare IT analyst OR clinical systems analyst',
-    where: 'Massachusetts',
-  },
-  cloudsec: {
-    label: 'Cloud Security Engineer',
-    what: 'cloud security engineer OR Azure security engineer',
-    where: 'Boston MA',
-  },
-  clinapp: {
-    label: 'Clinical Applications / Medical Device Specialist',
-    what: 'clinical applications specialist OR medical device clinical specialist',
-    where: 'Massachusetts',
-  },
-  netqeng: {
-    label: 'Network Engineer',
-    what: 'network engineer',
-    where: 'Massachusetts',
-  },
-  // Note: UN/NGO roles deliberately not included here — Adzuna's /us/ endpoint
-  // won't surface the field-based international postings that dominate that
-  // lane, so it stays link-only in the dashboard (see snapshot-note there).
-};
+  .feeds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 14px 16px;
+  }
+  .feed-link {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    text-decoration: none;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    padding: 7px 12px;
+    border-radius: 5px;
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+  .feed-link:hover { border-color: var(--amber); color: var(--amber); }
+  .feed-link:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .feed-link .arrow { color: var(--text-dim); margin-left: 4px; }
 
-const SALARY_MIN = 80000;
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours — keeps Adzuna calls low on the free tier
-
-// In-memory cache: { [lane]: { fetchedAt, jobs: [...] } }
-const cache = {};
-
-async function fetchLaneFromAdzuna(laneKey) {
-  const lane = LANES[laneKey];
-  if (!lane) throw new Error(`Unknown lane: ${laneKey}`);
-  if (!APP_ID || !APP_KEY) {
-    throw new Error('ADZUNA_APP_ID / ADZUNA_APP_KEY not set in environment variables');
+  .filter-note {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    padding: 0 16px 14px;
+    font-style: italic;
   }
 
-  const url = new URL(`https://api.adzuna.com/v1/api/jobs/us/search/1`);
-  url.searchParams.set('app_id', APP_ID);
-  url.searchParams.set('app_key', APP_KEY);
-  url.searchParams.set('what', lane.what);
-  url.searchParams.set('where', lane.where);
-  url.searchParams.set('salary_min', String(SALARY_MIN));
-  url.searchParams.set('results_per_page', '10');
-  url.searchParams.set('sort_by', 'date');
-  url.searchParams.set('content-type', 'application/json');
-
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Adzuna API error ${res.status}: ${text.slice(0, 300)}`);
+  /* Tracker */
+  .tracker {
+    margin-top: 32px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px 18px 20px;
   }
-  const data = await res.json();
-
-  const jobs = (data.results || []).map(j => ({
-    id: j.id,
-    title: j.title,
-    company: j.company && j.company.display_name,
-    location: j.location && j.location.display_name,
-    salaryMin: j.salary_min || null,
-    salaryMax: j.salary_max || null,
-    created: j.created,
-    url: j.redirect_url,
-    description: (j.description || '').slice(0, 280),
-  }));
-
-  return jobs;
-}
-
-async function getLane(laneKey, forceRefresh = false) {
-  const now = Date.now();
-  const cached = cache[laneKey];
-  if (!forceRefresh && cached && (now - cached.fetchedAt) < CACHE_TTL_MS) {
-    return { ...cached, fromCache: true };
+  .tracker h2 {
+    font-size: 16px;
+    margin: 0 0 4px;
   }
-  const jobs = await fetchLaneFromAdzuna(laneKey);
-  const entry = { fetchedAt: now, jobs };
-  cache[laneKey] = entry;
-  return { ...entry, fromCache: false };
-}
+  .tracker .sub { font-size: 12px; color: var(--text-dim); margin-bottom: 16px; }
 
-// ---- Routes ----
-
-app.get('/api/status', (req, res) => {
-  res.json({ status: 'ok', lanes: Object.keys(LANES), message: 'Job board API is running.' });
-});
-
-// Single lane: /api/jobs?lane=noc
-app.get('/api/jobs', async (req, res) => {
-  const laneKey = req.query.lane;
-  if (!laneKey || !LANES[laneKey]) {
-    return res.status(400).json({ error: `Missing or invalid lane. Valid lanes: ${Object.keys(LANES).join(', ')}` });
+  .add-row {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 0.8fr auto;
+    gap: 8px;
+    margin-bottom: 16px;
   }
-  try {
-    const forceRefresh = req.query.refresh === 'true';
-    const result = await getLane(laneKey, forceRefresh);
-    res.json({ lane: laneKey, label: LANES[laneKey].label, ...result });
-  } catch (err) {
-    res.status(502).json({ error: err.message });
-  }
-});
+  @media (max-width: 720px) { .add-row { grid-template-columns: 1fr 1fr; } }
 
-// All lanes at once: /api/jobs/all
-app.get('/api/jobs/all', async (req, res) => {
-  try {
-    const forceRefresh = req.query.refresh === 'true';
-    const laneKeys = Object.keys(LANES);
-    const results = await Promise.all(
-      laneKeys.map(async (key) => {
-        try {
-          const result = await getLane(key, forceRefresh);
-          return [key, { label: LANES[key].label, ...result }];
-        } catch (err) {
-          return [key, { label: LANES[key].label, error: err.message, jobs: [] }];
+  input, select, textarea {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 5px;
+  }
+  input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--teal); outline-offset: 1px;
+  }
+  .add-btn {
+    background: var(--teal);
+    color: #0b1512;
+    border: none;
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: 5px;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  .add-btn:hover { filter: brightness(1.08); }
+  .add-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+  .leads { display: flex; flex-direction: column; gap: 8px; }
+  .lead {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 0.8fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  @media (max-width: 720px) { .lead { grid-template-columns: 1fr 1fr; } }
+  .lead a { color: var(--text); text-decoration: none; }
+  .lead a:hover { color: var(--amber); }
+  .lead .company { color: var(--text-dim); font-size: 12px; }
+  .status-pill {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    text-align: center;
+    border: none;
+    cursor: pointer;
+  }
+  .status-New { background: rgba(79,184,174,0.18); color: var(--teal); }
+  .status-Applied { background: rgba(232,163,61,0.18); color: var(--amber); }
+  .status-Interview { background: rgba(110,201,127,0.18); color: var(--green); }
+  .status-Rejected { background: rgba(217,105,95,0.18); color: var(--red); }
+  .del-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    border-radius: 5px;
+    padding: 5px 8px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .del-btn:hover { border-color: var(--red); color: var(--red); }
+
+  .empty {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 10px 4px;
+  }
+
+  .footer-note {
+    margin-top: 20px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  /* Posting cards */
+  .postings {
+    padding: 14px 16px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .posting-card {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .posting-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .posting-title { font-weight: 650; font-size: 14px; }
+  .posting-company { font-size: 12.5px; color: var(--amber); margin-top: 1px; }
+  .posting-meta { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .posting-desc { font-size: 12.5px; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
+  .posting-apply {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    text-decoration: none;
+    background: var(--amber);
+    color: #241a08;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+  .posting-apply:hover { filter: brightness(1.08); }
+  .posting-apply:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+  .snapshot-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    padding: 2px 16px 10px;
+  }
+  .more-toggle {
+    background: transparent;
+    border: none;
+    color: var(--teal);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    cursor: pointer;
+    padding: 6px 16px 12px;
+  }
+  .more-toggle:hover { text-decoration: underline; }
+  .action-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .action-btn {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 700;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .action-btn.primary { background: var(--amber); color: #241a08; }
+  .action-btn.secondary { background: var(--panel-2); color: var(--teal); border: 1px solid var(--line); }
+  .action-btn:hover { filter: brightness(1.08); }
+  .action-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+  .action-toast {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--green);
+    align-self: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .action-toast.show { opacity: 1; }
+
+  .api-config {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--green);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .api-config label {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .api-config input {
+    flex: 1;
+    min-width: 220px;
+  }
+  .api-status {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .live-jobs {
+    padding: 0 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .live-jobs.empty-hint {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 0 16px 12px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="title-block">
+      <div class="eyebrow">Personal Ops Board</div>
+      <h1>Dulex's Job Search</h1>
+    </div>
+    <div class="clock">
+      <div class="live"><span class="dot"></span> BOARD ACTIVE</div>
+      <div id="clockTime">--:--:--</div>
+      <div id="clockDate">-</div>
+    </div>
+  </div>
+
+  <div class="brief">
+    Each button below opens a <b>live search</b> on that site — bookmark this page and click through each morning for fresh postings. After a feed loads, set its <b>salary filter to $80K+</b> in that site's own filter panel (URL-encoded salary filters aren't reliable across sites, so this is the one manual step). For the fastest true daily refresh, click <b>"Set Alert"</b> links where offered — that emails you new postings automatically instead of requiring a manual check.
+    <br><br>
+    <b>Why isn't there a "fetch live postings" button?</b> Job sites block browser scripts from other pages (this one included) from pulling their listings directly — that's a security rule, not a choice I made. A button that pretended to do it would just silently break. The two buttons below are the honest equivalent: one opens everything at once, the other asks me (Claude) to pull real fresh postings into this dashboard next time you're in chat.
+  </div>
+
+  <div class="action-bar">
+    <button class="action-btn primary" id="checkAllBtn">⚡ Check All Boards Now</button>
+    <button class="action-btn secondary" id="copyPromptBtn">📋 Copy Refresh Request</button>
+    <span class="action-toast" id="actionToast"></span>
+  </div>
+
+  <div class="api-config">
+    <span class="api-status" id="apiStatus" style="font-size:12.5px;">Checking connection…</span>
+    <button class="action-btn secondary" id="fetchLiveBtn" style="padding:8px 14px; margin-left:auto;">🔄 Refresh Live Postings</button>
+  </div>
+
+  <!-- Lane 1: NOC / IT Support -->
+  <div class="channel" data-lane="noc">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 1</span>
+        <div>
+          <h2>NOC / IT Support / Systems</h2>
+          <div class="channel-sub">Your strongest lane — 8 years NG911 infrastructure, NOC ops</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="noc">Mark checked today</button>
+    </div>
+    <div class="postings">
+      <div class="posting-card">
+        <div class="posting-top">
+          <div>
+            <div class="posting-title">NOC Technician</div>
+            <div class="posting-company">Granite Telecommunications — Quincy, MA</div>
+            <div class="posting-meta">~$50K–$69K (Glassdoor est.) · On-site</div>
+          </div>
+          <a class="posting-apply" target="_blank" href="https://www.glassdoor.com/job-listing/noc-technician-granite-telecommunications-JV_IC1154667_KO0,14_KE15,41.htm?jl=1009919712219">View & Apply ↗</a>
+        </div>
+        <div class="posting-desc">Monitors and troubleshoots client network infrastructure, manages a ticket queue, and works across SD-WAN, firewalls, and enterprise networking. CCNA or Network+ called out directly as qualifying certs. <b style="color:var(--red)">Below your $80K target</b> — worth checking if it's a stepping stone toward their Cloud Ops / Senior roles.</div>
+      </div>
+    </div>
+    <div class="snapshot-note">Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.</div>
+    <div class="live-jobs" id="live-noc"></div>
+    <button class="more-toggle" data-toggle="noc">+ more search links</button>
+    <div class="feeds collapsed" data-feeds="noc">
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/jobs?q=NOC+engineer&l=Boston%2C+MA">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=NOC%20Engineer&location=Boston%2C%20Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/candidate/search?search=NOC+Engineer&location=Boston%2C+MA">ZipRecruiter <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.simplyhired.com/search?q=noc+engineer&l=massachusetts">SimplyHired <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.glassdoor.com/Job/jobs.htm?sc.keyword=NOC+engineer&locT=S&locId=1154532">Glassdoor <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Try also: "network operations", "systems administrator" — widen if results are thin.</div>
+  </div>
+
+  <!-- Lane 2: Field Service -->
+  <div class="channel" data-lane="field">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 2</span>
+        <div>
+          <h2>Field Service Engineer</h2>
+          <div class="channel-sub">Medical device / regulated equipment — direct match to Zeiss work</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="field">Mark checked today</button>
+    </div>
+    <div class="postings">
+      <div class="posting-card">
+        <div class="posting-top">
+          <div>
+            <div class="posting-title">Field Service Engineer II (Medical Devices)</div>
+            <div class="posting-company">Boston Scientific — Boston, MA</div>
+            <div class="posting-meta">~$77K–$104K (market est.) · Northeast region travel</div>
+          </div>
+          <a class="posting-apply" target="_blank" href="https://jobs.bostonscientific.com/job/Boston-Field-Service-Engineer-II-(Medical-Devices)-Boston,-MA-MA-02101/1405621600/">View & Apply ↗</a>
+        </div>
+        <div class="posting-desc">Supports Cardiovascular Division products (IVUS, AngioJet, FARAPULSE, and similar systems) across the Northeast. Requires an Associate's degree/technical diploma plus 1 year experience — <b style="color:var(--green)">or an equivalent combination of training and work experience</b>, which directly fits your background.</div>
+      </div>
+    </div>
+    <div class="snapshot-note">Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.</div>
+    <div class="live-jobs" id="live-field"></div>
+    <button class="more-toggle" data-toggle="field">+ more search links</button>
+    <div class="feeds collapsed" data-feeds="field">
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/jobs?q=field+service+engineer+medical+device&l=Massachusetts">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=Field%20Service%20Engineer%20Medical%20Device&location=Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/Jobs/Field-Service-Engineer/-in-Boston,MA">ZipRecruiter <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://jobs.bostonscientific.com/search/?q=field+service">Boston Scientific <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.glassdoor.com/Job/massachusetts-field-service-engineer-jobs-SRCH_IL.0,13_IS3399_KO14,36.htm">Glassdoor <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Also check GE HealthCare, Philips, Siemens Healthineers, Canon Medical career pages directly.</div>
+  </div>
+
+  <!-- Lane 3: Cybersecurity -->
+  <div class="channel" data-lane="cyber">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 3</span>
+        <div>
+          <h2>Cybersecurity / SOC Analyst</h2>
+          <div class="channel-sub">Apply Tier 1 / Associate level — matches your BCS 365 experience</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="cyber">Mark checked today</button>
+    </div>
+    <div class="postings">
+      <div class="posting-card">
+        <div class="posting-top">
+          <div>
+            <div class="posting-title">Cybersecurity Analyst / SOC Analyst (multiple levels)</div>
+            <div class="posting-company">State Street — Quincy, MA</div>
+            <div class="posting-meta">~$80K–$120K (market est.) · Hybrid</div>
+          </div>
+          <a class="posting-apply" target="_blank" href="https://www.glassdoor.com/Job/boston-soc-analyst-jobs-SRCH_IL.0,6_IC1154532_KO7,18.htm">View & Apply ↗</a>
+        </div>
+        <div class="posting-desc">State Street's Fusion Center runs 24/7 threat detection and response; they post multiple SOC tiers regularly. <b style="color:var(--amber)">Filter for "Cybersecurity Analyst" or entry associate-level</b> — the Lead/Senior postings want 4+ years dedicated SOC/IR experience, above your current level.</div>
+      </div>
+    </div>
+    <div class="snapshot-note">Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.</div>
+    <div class="live-jobs" id="live-cyber"></div>
+    <button class="more-toggle" data-toggle="cyber">+ more search links</button>
+    <div class="feeds collapsed" data-feeds="cyber">
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/jobs?q=SOC+analyst&l=Boston%2C+MA">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=SOC%20Analyst%20Tier%201&location=Boston%2C%20Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/Jobs/Soc-Analyst-Tier-1/-in-Boston,MA">ZipRecruiter <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.glassdoor.com/Job/boston-entry-level-cyber-security-jobs-SRCH_IL.0,6_IC1154532_KO7,33.htm">Glassdoor <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Search "Tier 1" or "Associate" explicitly — avoids senior-level mismatches.</div>
+  </div>
+
+  <!-- Lane 4: E911 / NG911 -->
+  <div class="channel" data-lane="e911">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 4</span>
+        <div>
+          <h2>E911 / NG911 Niche</h2>
+          <div class="channel-sub">Specialized — thin but high-fit when it hits</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="e911">Mark checked today</button>
+    </div>
+    <div class="snapshot-note" style="padding-top:12px;">Nothing matching your Technical/IT profile is currently open on NENA/MassNENA — this lane is link-only until something posts. Check back regularly; it moves in bursts.</div>
+    <div class="live-jobs" id="live-e911"></div>
+    <div class="feeds">
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/Jobs/E911-Engineer">ZipRecruiter (E911) <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/q-Ng911-jobs.html">Indeed (NG911) <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://jobs.nena.org/jobs/state/massachusetts/">NENA board <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.massnena.org/jobs-1-1">MassNENA <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.everbridge.com/about/careers/">Everbridge (Burlington, MA) <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/q-motorola-solutions-l-massachusetts-jobs.html">Motorola Solutions <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Lead with named product experience (Motorola CallWorks, OMON) in any application here.</div>
+  </div>
+
+  <!-- Lane 5: Desktop Support -->
+  <div class="channel" data-lane="desktop">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 5</span>
+        <div>
+          <h2>Desktop Support / End User Support</h2>
+          <div class="channel-sub">Direct match — six roles on your resume touch this exact work</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="desktop">Mark checked today</button>
+    </div>
+    <div class="postings">
+      <div class="posting-card">
+        <div class="posting-top">
+          <div>
+            <div class="posting-title">End User Support Specialist</div>
+            <div class="posting-company">Barings — Boston, MA</div>
+            <div class="posting-meta">$85,900–$137,500 (posted range) · On-site/Hybrid</div>
+          </div>
+          <a class="posting-apply" target="_blank" href="https://www.simplyhired.com/search?q=desktop+support+specialist&l=boston,+ma">View & Apply ↗</a>
+        </div>
+        <div class="posting-desc">First and second-line support for end users, resolving technical issues and maintaining high service standards — direct overlap with your Rue La La and Harvard SPH experience. Link goes to the search result; open it and look for the Barings listing specifically since direct-apply links go stale fast on aggregators.</div>
+      </div>
+    </div>
+    <div class="snapshot-note">Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.</div>
+    <div class="live-jobs" id="live-desktop"></div>
+    <button class="more-toggle" data-toggle="desktop">+ more search links</button>
+    <div class="feeds collapsed" data-feeds="desktop">
+      <a class="feed-link" target="_blank" href="https://www.indeed.com/jobs?q=desktop+support&l=Boston%2C+MA">Indeed <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.linkedin.com/jobs/search/?keywords=Desktop%20Support&location=Boston%2C%20Massachusetts">LinkedIn <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.ziprecruiter.com/Jobs/Desktop-Support/-in-Boston,MA">ZipRecruiter <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.glassdoor.com/Job/boston-desktop-support-jobs-SRCH_IL.0,6_IC1154532_KO7,22.htm">Glassdoor <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Watch pay carefully in this lane — many desktop support postings run $50K–$70K; filter for "End User Support," "IT Support Engineer," or "Senior" to stay near your target.</div>
+  </div>
+
+  <!-- Lane 6: UN / NGO / International -->
+  <div class="channel" data-lane="ngo">
+    <div class="channel-head">
+      <div class="channel-name">
+        <span class="channel-tag">LANE 6</span>
+        <div>
+          <h2>UN / NGO / International</h2>
+          <div class="channel-sub">Honest flag: most open roles are field-based, local-salary, or need prior INGO experience</div>
+        </div>
+      </div>
+      <button class="checked-btn" data-check="ngo">Mark checked today</button>
+    </div>
+    <div class="snapshot-note" style="padding-top:12px;">Checked ReliefWeb/UNjobs directly — current ICT/IT Support postings are based in Ethiopia, Kenya, Syria, Philippines, etc., paying local rates well under $80K USD-equivalent, or explicitly require prior NGO/INGO field experience. No US-based, $80K+ match right now. Worth checking periodically — this shifts often — but don't expect this lane to move as fast as the others.</div>
+    <div class="feeds">
+      <a class="feed-link" target="_blank" href="https://careers.un.org/jobopening">UN Careers portal <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://reliefweb.int/jobs">ReliefWeb Jobs <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://www.impactpool.org/jobs/c/remote-ngo-jobs">Impactpool (remote NGO) <span class="arrow">↗</span></a>
+      <a class="feed-link" target="_blank" href="https://unjobs.org/skills/ict">UNjobs.org (ICT filter) <span class="arrow">↗</span></a>
+    </div>
+    <div class="filter-note">Filter ReliefWeb/UNjobs by country = United States for any chance at a US-based salary. Field Service (GS) category roles are your best formal fit — see earlier conversation on the nationality restriction for Haiti-based posts specifically.</div>
+  </div>
+
+  <!-- Tracker -->
+  <div class="tracker">
+    <h2>Lead Tracker</h2>
+    <div class="sub">Saved privately to this browser session's storage — not shared.</div>
+
+    <div class="add-row">
+      <input id="inTitle" placeholder="Job title" />
+      <input id="inCompany" placeholder="Company" />
+      <input id="inUrl" placeholder="Link (paste URL)" />
+      <select id="inLane">
+        <option value="noc">NOC/IT</option>
+        <option value="field">Field Svc</option>
+        <option value="cyber">Cyber</option>
+        <option value="e911">E911</option>
+        <option value="desktop">Desktop</option>
+        <option value="ngo">UN/NGO</option>
+      </select>
+      <button class="add-btn" id="addBtn">+ Add lead</button>
+    </div>
+
+    <div id="leadsList" class="leads">
+      <div class="empty">Loading your saved leads…</div>
+    </div>
+  </div>
+
+  <div class="footer-note">Refresh this page daily. Leads and "last checked" marks persist automatically.</div>
+
+</div>
+
+<script>
+  function setApiStatus(msg, ok) {
+    const el = document.getElementById('apiStatus');
+    el.textContent = msg;
+    el.style.color = ok ? 'var(--green)' : 'var(--text-dim)';
+  }
+
+  function renderLiveJobs(laneKey, jobs, errorMsg) {
+    const el = document.getElementById(`live-${laneKey}`);
+    if (!el) return;
+    if (errorMsg) {
+      el.innerHTML = `<div class="empty" style="color:var(--red);">Live fetch failed: ${escapeHtml(errorMsg)}</div>`;
+      return;
+    }
+    if (!jobs || !jobs.length) {
+      el.innerHTML = `<div class="empty">No live results from the API for this lane right now.</div>`;
+      return;
+    }
+    el.innerHTML = jobs.map(j => `
+      <div class="posting-card">
+        <div class="posting-top">
+          <div>
+            <div class="posting-title">${escapeHtml(j.title || 'Untitled role')}</div>
+            <div class="posting-company">${escapeHtml(j.company || 'Unknown company')} — ${escapeHtml(j.location || '')}</div>
+            <div class="posting-meta">${j.salaryMin ? '$' + Math.round(j.salaryMin).toLocaleString() : '?'}${j.salaryMax ? '–$' + Math.round(j.salaryMax).toLocaleString() : ''} · via Adzuna</div>
+          </div>
+          ${j.url ? `<a class="posting-apply" target="_blank" href="${escapeAttr(j.url)}">View & Apply ↗</a>` : ''}
+        </div>
+        ${j.description ? `<div class="posting-desc">${escapeHtml(j.description)}…</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // Same-origin now — dashboard and API are served by the same Railway app,
+  // so this just calls a relative path. No URL configuration needed.
+  async function fetchLivePostings() {
+    setApiStatus('Fetching…', false);
+    try {
+      const res = await fetch('/api/jobs/all');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      let totalJobs = 0;
+      Object.entries(data).forEach(([laneKey, laneData]) => {
+        if (laneData.error) {
+          renderLiveJobs(laneKey, null, laneData.error);
+        } else {
+          renderLiveJobs(laneKey, laneData.jobs, null);
+          totalJobs += (laneData.jobs || []).length;
         }
-      })
-    );
-    res.json(Object.fromEntries(results));
-  } catch (err) {
-    res.status(502).json({ error: err.message });
+      });
+      setApiStatus(`✓ Live — ${totalJobs} postings loaded`, true);
+    } catch (e) {
+      setApiStatus(`Static snapshot only — live API unreachable (${e.message})`, false);
+    }
   }
-});
 
-// Scout — a single endpoint that handles both freeform career-advice chat
-// AND structured postings search, sharing one background prompt so there's
-// no duplicate system prompt (and no duplicate API surface) to maintain.
-// Costs a small amount per call (web search + generation) — the real, paid
-// Anthropic API, unlike Adzuna's free tier. Postings search results are
-// cached for 12 hours so repeat clicks (or accidental double-clicks) don't
-// re-trigger a paid search each time.
-const LANE_ID_LIST = 'noc, field, cyber, e911, desktop, ngo, mdcs, bmet, healthit, cloudsec, clinapp, netqeng';
+  document.getElementById('fetchLiveBtn').addEventListener('click', fetchLivePostings);
 
-const SCOUT_SYSTEM_PROMPT = `You are "Scout," a career-niche advisor for Dulex Cherenfant, a Boston-area IT/field-service professional, embedded in his personal job search dashboard.
+  // Try once automatically on load — silent fallback to static snapshot if not deployed yet
+  fetchLivePostings();
 
-BACKGROUND (ground every answer in this — never generic advice):
-- 15+ years IT: NOC Engineer at Comtech (8 yrs, NG911/VoIP mission-critical infrastructure for Massachusetts, SolarWinds, 99%+ SLA), Security Analyst at BCS 365 (Microsoft Sentinel, CrowdStrike Falcon, Qualys — vulnerability analysis, incident investigation), TechOps Engineer at VMware (datacenter/R&D infra), currently Field Service Engineer (contract via Resourceful Inc.) servicing Zeiss CIRRUS OCT/HFA diagnostic instruments under FDA-regulated change-control procedures across New England.
-- Certifications (previously held/lapsed): CompTIA Security+, Network+, A+, Cisco CCNA, Microsoft Azure Fundamentals, AZ-500/Azure Security Engineer Associate (Entra ID, RBAC, PIM, Conditional Access, Key Vault, Defender for Cloud, Sentinel/KQL). Currently studying CySA+.
-- No bachelor's degree — two years of general college coursework plus an in-person IT program, no degree conferred.
-- Trilingual: English, French, Haitian Creole. Based in Randolph, MA.
-- Also a solo software founder running several live products for the Haitian diaspora, with a large Facebook audience across Boston/Miami/NYC/Montreal/Haiti. Prefers async/inbound work over outbound or in-person sales.
-- Target: $80K+ where the lane supports it, Massachusetts/New England, on-site or hybrid.
-
-THE DASHBOARD'S 12 LANES (use these exact laneId values when returning postings, nothing else — don't re-suggest these as "new" niches, build on them or go genuinely further): ${LANE_ID_LIST}
-
-You operate in two modes depending on what's asked:
-1. CONVERSATIONAL — answer questions about fit, demand, strategy, or new niche combinations. Use web search for anything checkable (demand, employers, current postings) rather than guessing. Keep answers tight: 2-4 short paragraphs or a short list, ending with one concrete next action. No filler, no "as an AI" disclaimers, no restating his bio back to him.
-2. POSTINGS SEARCH — when explicitly asked to find/return current postings as JSON, search the web for 5 to 8 REAL, CURRENTLY OPEN postings spread across the lanes above. Only include a posting if you found a real URL via search — never invent one. Respond with ONLY a raw JSON array in that case, no markdown fences, no other text. Schema per item: {"laneId": "...", "laneTitle": "2-4 word label", "title": "...", "company": "...", "meta": "salary/work-arrangement, a few words", "url": "...", "desc": "1-2 sentences, second person, specific to his background", "postedDate": "Mon DD, YYYY — today"}`;
-
-let cachedPostings = null; // { items, refreshedAt } — in-memory, cleared on server restart
-const POSTINGS_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
-
-async function callScout(messages, maxTokens) {
-  const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-5',
-      max_tokens: maxTokens,
-      system: SCOUT_SYSTEM_PROMPT,
-      messages,
-      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }],
-    }),
+  // Action bar: Check All Boards Now
+  const PRIMARY_SEARCHES = [
+    'https://www.indeed.com/jobs?q=NOC+engineer&l=Boston%2C+MA',
+    'https://www.indeed.com/jobs?q=field+service+engineer+medical+device&l=Massachusetts',
+    'https://www.indeed.com/jobs?q=SOC+analyst&l=Boston%2C+MA',
+    'https://www.ziprecruiter.com/Jobs/E911-Engineer',
+    'https://www.indeed.com/jobs?q=desktop+support&l=Boston%2C+MA',
+    'https://reliefweb.int/jobs'
+  ];
+  function showToast(msg) {
+    const t = document.getElementById('actionToast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+  document.getElementById('checkAllBtn').addEventListener('click', () => {
+    let opened = 0;
+    PRIMARY_SEARCHES.forEach(url => {
+      const w = window.open(url, '_blank');
+      if (w) opened++;
+    });
+    if (opened === PRIMARY_SEARCHES.length) {
+      showToast(`✓ Opened ${opened} live searches`);
+    } else {
+      showToast(`Opened ${opened}/${PRIMARY_SEARCHES.length} — your browser may have blocked pop-ups, allow them for this page`);
+    }
   });
-  if (!apiRes.ok) {
-    const text = await apiRes.text().catch(() => '');
-    throw new Error(`Anthropic API error ${apiRes.status}: ${text.slice(0, 300)}`);
-  }
-  const data = await apiRes.json();
-  const textBlocks = (data.content || []).filter(b => b.type === 'text').map(b => b.text);
-  return textBlocks.join('\n\n').trim();
-}
 
-// mode: 'chat' (default) — { messages: [...] } -> { reply }
-// mode: 'postings' — no body needed -> { items, refreshedAt, fromCache }
-app.post('/api/scout', async (req, res) => {
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on the server — add it in Railway → Variables.' });
-  }
-  const mode = req.body.mode === 'postings' ? 'postings' : 'chat';
-
-  try {
-    if (mode === 'postings') {
-      const forceRefresh = req.body.forceRefresh === true;
-      const now = Date.now();
-      if (!forceRefresh && cachedPostings && (now - cachedPostings.fetchedAt) < POSTINGS_CACHE_TTL_MS) {
-        return res.json({ items: cachedPostings.items, refreshedAt: cachedPostings.refreshedAt, fromCache: true });
-      }
-
-      const raw = await callScout([{ role: 'user', content: 'Find current real postings now (POSTINGS SEARCH mode) and return the JSON array.' }], 2000);
-      const cleanedRaw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
-      const jsonStart = cleanedRaw.indexOf('[');
-      const jsonEnd = cleanedRaw.lastIndexOf(']');
-      if (jsonStart === -1 || jsonEnd === -1) throw new Error('Model did not return a JSON array');
-      const parsed = JSON.parse(cleanedRaw.slice(jsonStart, jsonEnd + 1));
-
-      const validLanes = LANE_ID_LIST.split(', ');
-      const cleaned = parsed.filter(p => p && p.url && p.title && validLanes.includes(p.laneId));
-      if (!cleaned.length) throw new Error('No valid postings came back from the search');
-
-      const refreshedAt = new Date().toISOString();
-      cachedPostings = { items: cleaned, refreshedAt, fetchedAt: now };
-      return res.json({ items: cleaned, refreshedAt, fromCache: false });
+  document.getElementById('copyPromptBtn').addEventListener('click', async () => {
+    const prompt = "Refresh my job search dashboard — pull current postings for NOC/IT support, Field Service Engineer (medical device), Cybersecurity/SOC Analyst, and E911/NG911 roles in Massachusetts/New England, $80K+, and rebuild the dashboard cards with real current listings.";
+    try {
+      await navigator.clipboard.writeText(prompt);
+      showToast('✓ Copied — paste into a chat with Claude');
+    } catch (e) {
+      showToast('Could not copy — select and copy manually: ' + prompt);
     }
+  });
 
-    // chat mode
-    const messages = Array.isArray(req.body.messages) ? req.body.messages : null;
-    if (!messages || !messages.length) {
-      return res.status(400).json({ error: 'messages array required' });
-    }
-    const reply = await callScout(messages.map(m => ({ role: m.role, content: m.content })), 800)
-      || "Couldn't generate a response — try rephrasing.";
-    res.json({ reply });
-  } catch (err) {
-    res.status(502).json({ error: err.message });
+  // Toggle "more search links"
+  document.querySelectorAll('[data-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lane = btn.getAttribute('data-toggle');
+      const feeds = document.querySelector(`[data-feeds="${lane}"]`);
+      const isCollapsed = feeds.classList.toggle('collapsed');
+      btn.textContent = isCollapsed ? '+ more search links' : '– hide search links';
+    });
+  });
+
+  // Clock
+  function tick() {
+    const now = new Date();
+    document.getElementById('clockTime').textContent = now.toLocaleTimeString('en-US', { hour12: false });
+    document.getElementById('clockDate').textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   }
-});
+  tick();
+  setInterval(tick, 1000);
 
-app.listen(PORT, () => {
-  console.log(`Job board API listening on port ${PORT}`);
-});
+  // "Mark checked today" per lane
+  const LANE_KEY = 'lane-checked-v1';
+  async function loadLaneChecks() {
+    try {
+      const res = await window.storage.get(LANE_KEY, false);
+      return res && res.value ? JSON.parse(res.value) : {};
+    } catch (e) { return {}; }
+  }
+  async function saveLaneChecks(data) {
+    try { await window.storage.set(LANE_KEY, JSON.stringify(data), false); }
+    catch (e) { console.error('save failed', e); }
+  }
+  function renderLaneCheck(btn, dateStr) {
+    const today = new Date().toDateString();
+    if (dateStr === today) {
+      btn.textContent = '✓ Checked today';
+      btn.style.color = 'var(--green)';
+      btn.style.borderColor = 'var(--green)';
+    } else {
+      btn.textContent = 'Mark checked today';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }
+  }
+  document.querySelectorAll('[data-check]').forEach(async (btn) => {
+    const lane = btn.getAttribute('data-check');
+    const checks = await loadLaneChecks();
+    renderLaneCheck(btn, checks[lane]);
+    btn.addEventListener('click', async () => {
+      const checks = await loadLaneChecks();
+      checks[lane] = new Date().toDateString();
+      await saveLaneChecks(checks);
+      renderLaneCheck(btn, checks[lane]);
+    });
+  });
+
+  // Lead tracker
+  const LEADS_KEY = 'leads-v1';
+  let leads = [];
+
+  async function loadLeads() {
+    try {
+      const res = await window.storage.get(LEADS_KEY, false);
+      leads = res && res.value ? JSON.parse(res.value) : [];
+    } catch (e) { leads = []; }
+    renderLeads();
+  }
+  async function persistLeads() {
+    try { await window.storage.set(LEADS_KEY, JSON.stringify(leads), false); }
+    catch (e) { console.error('save failed', e); }
+  }
+
+  function laneLabel(l) {
+    return { noc: 'NOC/IT', field: 'Field Svc', cyber: 'Cyber', e911: 'E911', desktop: 'Desktop', ngo: 'UN/NGO' }[l] || l;
+  }
+
+  function renderLeads() {
+    const el = document.getElementById('leadsList');
+    if (!leads.length) {
+      el.innerHTML = '<div class="empty">No leads saved yet — add one above, or paste in a link you found on any lane.</div>';
+      return;
+    }
+    el.innerHTML = leads.map((lead, i) => `
+      <div class="lead">
+        <div>
+          ${lead.url ? `<a href="${escapeAttr(lead.url)}" target="_blank">${escapeHtml(lead.title || 'Untitled')}</a>` : escapeHtml(lead.title || 'Untitled')}
+        </div>
+        <div class="company">${escapeHtml(lead.company || '—')}</div>
+        <div class="company">${laneLabel(lead.lane)}</div>
+        <select class="status-pill status-${lead.status}" data-idx="${i}" data-role="status">
+          <option value="New" ${lead.status === 'New' ? 'selected' : ''}>New</option>
+          <option value="Applied" ${lead.status === 'Applied' ? 'selected' : ''}>Applied</option>
+          <option value="Interview" ${lead.status === 'Interview' ? 'selected' : ''}>Interview</option>
+          <option value="Rejected" ${lead.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
+        </select>
+        <button class="del-btn" data-idx="${i}" data-role="del">Remove</button>
+      </div>
+    `).join('');
+
+    el.querySelectorAll('[data-role="status"]').forEach(sel => {
+      sel.addEventListener('change', async (e) => {
+        const idx = parseInt(e.target.getAttribute('data-idx'));
+        leads[idx].status = e.target.value;
+        await persistLeads();
+        renderLeads();
+      });
+    });
+    el.querySelectorAll('[data-role="del"]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const idx = parseInt(e.target.getAttribute('data-idx'));
+        leads.splice(idx, 1);
+        await persistLeads();
+        renderLeads();
+      });
+    });
+  }
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str || '';
+    return d.innerHTML;
+  }
+  function escapeAttr(str) {
+    return (str || '').replace(/"/g, '&quot;');
+  }
+
+  document.getElementById('addBtn').addEventListener('click', async () => {
+    const title = document.getElementById('inTitle').value.trim();
+    const company = document.getElementById('inCompany').value.trim();
+    const url = document.getElementById('inUrl').value.trim();
+    const lane = document.getElementById('inLane').value;
+    if (!title && !company && !url) return;
+    leads.unshift({ title, company, url, lane, status: 'New', dateAdded: new Date().toISOString() });
+    await persistLeads();
+    renderLeads();
+    document.getElementById('inTitle').value = '';
+    document.getElementById('inCompany').value = '';
+    document.getElementById('inUrl').value = '';
+  });
+
+  loadLeads();
+</script>
+</body>
+</html>
