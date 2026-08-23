@@ -96,7 +96,6 @@ const LANES = {
   // lane, so it stays link-only in the dashboard (see snapshot-note there).
 };
 
-const SALARY_MIN = 80000;
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours — keeps Adzuna calls low on the free tier
 
 // In-memory cache: { [lane]: { fetchedAt, jobs: [...] } }
@@ -114,8 +113,7 @@ async function fetchLaneFromAdzuna(laneKey) {
   url.searchParams.set('app_key', APP_KEY);
   url.searchParams.set('what', lane.what);
   url.searchParams.set('where', lane.where);
-  url.searchParams.set('salary_min', String(SALARY_MIN));
-  url.searchParams.set('results_per_page', '10');
+  url.searchParams.set('results_per_page', '20');
   url.searchParams.set('sort_by', 'date');
   url.searchParams.set('content-type', 'application/json');
 
@@ -218,12 +216,12 @@ THE DASHBOARD'S 12 LANES (use these exact laneId values when returning postings,
 
 You operate in two modes depending on what's asked:
 1. CONVERSATIONAL — answer questions about fit, demand, strategy, or new niche combinations. Use web search for anything checkable (demand, employers, current postings) rather than guessing. Keep answers tight: 2-4 short paragraphs or a short list, ending with one concrete next action. No filler, no "as an AI" disclaimers, no restating his bio back to him.
-2. POSTINGS SEARCH — when explicitly asked to find/return current postings as JSON, search the web for 5 to 8 REAL, CURRENTLY OPEN postings spread across the lanes above. Only include a posting if you found a real URL via search — never invent one. Respond with ONLY a raw JSON array in that case, no markdown fences, no other text. Schema per item: {"laneId": "...", "laneTitle": "2-4 word label", "title": "...", "company": "...", "meta": "salary/work-arrangement, a few words", "url": "...", "desc": "1-2 sentences, second person, specific to his background", "postedDate": "Mon DD, YYYY — today"}`;
+2. POSTINGS SEARCH — when explicitly asked to find/return current postings as JSON, search the web for 10 to 15 REAL, CURRENTLY OPEN postings spread across as many of the 12 lanes above as you can find real openings for — aim for breadth across lanes, not just depth in one or two. Only include a posting if you found a real URL via search — never invent one. Respond with ONLY a raw JSON array in that case, no markdown fences, no other text. Schema per item: {"laneId": "...", "laneTitle": "2-4 word label", "title": "...", "company": "...", "meta": "salary/work-arrangement, a few words", "url": "...", "desc": "1-2 sentences, second person, specific to his background", "postedDate": "Mon DD, YYYY — today"}`;
 
 let cachedPostings = null; // { items, refreshedAt } — in-memory, cleared on server restart
 const POSTINGS_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
-async function callScout(messages) {
+async function callScout(messages, maxTokens, maxSearches) {
   const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -233,10 +231,10 @@ async function callScout(messages) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 2000,
+      max_tokens: maxTokens,
       system: SCOUT_SYSTEM_PROMPT,
       messages,
-      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxSearches }],
     }),
   });
   if (!apiRes.ok) {
@@ -264,7 +262,7 @@ app.post('/api/scout', async (req, res) => {
         return res.json({ items: cachedPostings.items, refreshedAt: cachedPostings.refreshedAt, fromCache: true });
       }
 
-      const raw = await callScout([{ role: 'user', content: 'Find current real postings now (POSTINGS SEARCH mode) and return the JSON array.' }]);
+      const raw = await callScout([{ role: 'user', content: 'Find current real postings now (POSTINGS SEARCH mode) and return the JSON array.' }], 3000, 12);
       const cleanedRaw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
       const jsonStart = cleanedRaw.indexOf('[');
       const jsonEnd = cleanedRaw.lastIndexOf(']');
@@ -285,7 +283,7 @@ app.post('/api/scout', async (req, res) => {
     if (!messages || !messages.length) {
       return res.status(400).json({ error: 'messages array required' });
     }
-    const reply = await callScout(messages.map(m => ({ role: m.role, content: m.content })))
+    const reply = await callScout(messages.map(m => ({ role: m.role, content: m.content })), 800, 6)
       || "Couldn't generate a response — try rephrasing.";
     res.json({ reply });
   } catch (err) {
