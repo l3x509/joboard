@@ -182,6 +182,12 @@
     font-family: var(--mono); font-size: 9.5px; color: var(--text-faint); white-space: nowrap;
   }
   .curated-age.stale { color: var(--red); }
+  .star-btn {
+    background: none; border: none; color: var(--text-faint); font-size: 15px; cursor: pointer;
+    line-height: 1; padding: 0 2px;
+  }
+  .star-btn:hover { color: var(--amber); }
+  .star-btn.on { color: var(--amber); }
   .curated-card-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; line-height: 1.3; }
   .curated-card-company { font-size: 11.5px; color: var(--text-dim); margin-bottom: 4px; }
   .curated-card-meta { font-family: var(--mono); font-size: 10px; color: var(--text-faint); }
@@ -270,6 +276,14 @@
     border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px; text-decoration: none;
   }
   .feed-link:hover { border-color: var(--teal); color: var(--teal); }
+  .companies-row { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; align-items: center; }
+  .companies-label { font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); margin-right: 2px; }
+  .company-chip {
+    font-family: var(--mono); font-size: 10.5px; color: var(--text-dim); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 12px; padding: 5px 10px; cursor: pointer;
+  }
+  .company-chip:hover { border-color: var(--amber-dim); }
+  .company-chip.checked { color: var(--green); border-color: var(--green); }
   .filter-note {
     font-family: var(--mono); font-size: 11px; color: var(--text-faint); line-height: 1.6;
     border-left: 2px solid var(--line); padding-left: 10px;
@@ -315,6 +329,15 @@
   .del-btn:hover { color: var(--red); border-color: var(--red); }
   .tracker-empty { font-family: var(--mono); font-size: 11px; color: var(--text-faint); padding: 14px 4px; line-height: 1.6; }
   .lead-flash { animation: flash-in .6s ease; }
+  .stale-nudge {
+    margin: 0 10px 8px; padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--amber-dim);
+    border-radius: 6px; font-family: var(--mono); font-size: 10.5px; color: var(--amber); line-height: 1.5;
+  }
+  .lead.stale { border-color: var(--amber-dim); }
+  .resume-tag {
+    font-family: var(--mono); font-size: 9.5px; color: var(--text-faint); border: 1px solid var(--line);
+    border-radius: 3px; padding: 1px 6px; display: inline-block; margin-top: 4px;
+  }
   @keyframes flash-in { 0% { background: var(--teal-dim); } 100% { background: var(--panel); } }
 
   @media (max-width: 1099px) {
@@ -352,11 +375,11 @@
   <div class="curated-strip">
     <div class="curated-strip-head">
       <div>
-        <div class="curated-strip-title"><span class="amber-dot"></span>Curated Picks<span class="curated-strip-sub" id="curatedSub">Hand-researched postings — click a card to jump to that lane</span></div>
+        <div class="curated-strip-title"><span class="amber-dot"></span>This Week<span class="curated-strip-sub" id="curatedSub">Star a posting from any lane, or check back after refreshing live results</span></div>
       </div>
       <div style="display:flex; gap:8px; align-items:center;">
         <button class="curated-collapse-btn" id="curatedToggleBtn">– Collapse</button>
-        <button class="tb-btn" id="refreshCuratedBtn">🔎 Search for New Postings</button>
+        <button class="curated-collapse-btn" id="clearNewBtn" style="display:none;">Clear NEW badges</button>
       </div>
     </div>
     <div class="curated-cards" id="curatedCards"></div>
@@ -370,14 +393,23 @@
     <div class="tracker-head">
       <h2>Lead Tracker</h2>
       <div class="sub">Saved to this browser — click "+ Track" on any posting to add it here</div>
+      <button class="curated-collapse-btn" id="exportCsvBtn" style="margin-top:8px;">⬇ Export CSV</button>
     </div>
     <div class="tracker-form">
       <input id="inTitle" placeholder="Job title" />
       <input id="inCompany" placeholder="Company" />
       <input id="inUrl" placeholder="Link (paste URL)" />
       <select id="inLane"></select>
+      <select id="inResume">
+        <option value="">Resume version sent…</option>
+        <option value="General IT/Field Tech">General IT/Field Tech</option>
+        <option value="Cybersecurity">Cybersecurity</option>
+        <option value="UN/ICT">UN/ICT</option>
+        <option value="Medical Device Cybersecurity">Medical Device Cybersecurity</option>
+      </select>
       <button class="add-btn" id="addBtn">+ Add lead</button>
     </div>
+    <div class="stale-nudge" id="staleNudge" style="display:none;"></div>
     <div class="leads-list" id="leadsList">
       <div class="tracker-empty">Loading your saved leads…</div>
     </div>
@@ -408,10 +440,12 @@
 </div>
 
 <script>
-  const LANES = [{"num": 1, "id": "noc", "title": "NOC / IT Support / Systems", "sub": "Your strongest lane — 8 years NG911 infrastructure, NOC ops", "postings": [{"title": "NOC Technician", "company": "Granite Telecommunications — Quincy, MA", "meta": "~$50K–$69K (Glassdoor est.) · On-site", "url": "https://www.glassdoor.com/job-listing/noc-technician-granite-telecommunications-JV_IC1154667_KO0,14_KE15,41.htm?jl=1009919712219", "desc": "Monitors and troubleshoots client network infrastructure, manages a ticket queue, and works across SD-WAN, firewalls, and enterprise networking. CCNA or Network+ called out directly as qualifying certs. <b style=\"color:var(--red)\">Below your $80K target</b> — worth checking if it's a stepping stone toward their Cloud Ops / Senior roles."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=NOC+engineer&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=NOC%20Engineer&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=NOC+Engineer&location=Boston%2C+MA", "label": "ZipRecruiter"}, {"url": "https://www.simplyhired.com/search?q=noc+engineer&l=massachusetts", "label": "SimplyHired"}, {"url": "https://www.glassdoor.com/Job/jobs.htm?sc.keyword=NOC+engineer&locT=S&locId=1154532", "label": "Glassdoor"}], "filterNote": "Try also: \"network operations\", \"systems administrator\" — widen if results are thin."}, {"num": 2, "id": "field", "title": "Field Service Engineer", "sub": "Medical device / regulated equipment — direct match to Zeiss work", "postings": [{"title": "Field Service Engineer II (Medical Devices)", "company": "Boston Scientific — Boston, MA", "meta": "~$77K–$104K (market est.) · Northeast region travel", "url": "https://jobs.bostonscientific.com/job/Boston-Field-Service-Engineer-II-(Medical-Devices)-Boston,-MA-MA-02101/1405621600/", "desc": "Supports Cardiovascular Division products (IVUS, AngioJet, FARAPULSE, and similar systems) across the Northeast. Requires an Associate's degree/technical diploma plus 1 year experience — <b style=\"color:var(--green)\">or an equivalent combination of training and work experience</b>, which directly fits your background."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=field+service+engineer+medical+device&l=Massachusetts", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=Field%20Service%20Engineer%20Medical%20Device&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Field-Service-Engineer/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://jobs.bostonscientific.com/search/?q=field+service", "label": "Boston Scientific"}, {"url": "https://www.glassdoor.com/Job/massachusetts-field-service-engineer-jobs-SRCH_IL.0,13_IS3399_KO14,36.htm", "label": "Glassdoor"}], "filterNote": "Also check GE HealthCare, Philips, Siemens Healthineers, Canon Medical career pages directly."}, {"num": 3, "id": "cyber", "title": "Cybersecurity / SOC Analyst", "sub": "Apply Tier 1 / Associate level — matches your BCS 365 experience", "postings": [{"title": "Cybersecurity Analyst / SOC Analyst (multiple levels)", "company": "State Street — Quincy, MA", "meta": "~$80K–$120K (market est.) · Hybrid", "url": "https://www.glassdoor.com/Job/boston-soc-analyst-jobs-SRCH_IL.0,6_IC1154532_KO7,18.htm", "desc": "State Street's Fusion Center runs 24/7 threat detection and response; they post multiple SOC tiers regularly. <b style=\"color:var(--amber)\">Filter for \"Cybersecurity Analyst\" or entry associate-level</b> — the Lead/Senior postings want 4+ years dedicated SOC/IR experience, above your current level."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=SOC+analyst&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=SOC%20Analyst%20Tier%201&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Soc-Analyst-Tier-1/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://www.glassdoor.com/Job/boston-entry-level-cyber-security-jobs-SRCH_IL.0,6_IC1154532_KO7,33.htm", "label": "Glassdoor"}], "filterNote": "Search \"Tier 1\" or \"Associate\" explicitly — avoids senior-level mismatches."}, {"num": 4, "id": "e911", "title": "E911 / NG911 Niche", "sub": "Specialized — thin but high-fit when it hits", "postings": [], "snapshot": "Nothing matching your Technical/IT profile is currently open on NENA/MassNENA — this lane is link-only until something posts. Check back regularly; it moves in bursts.", "feeds": [{"url": "https://www.ziprecruiter.com/Jobs/E911-Engineer", "label": "ZipRecruiter (E911)"}, {"url": "https://www.indeed.com/q-Ng911-jobs.html", "label": "Indeed (NG911)"}, {"url": "https://jobs.nena.org/jobs/state/massachusetts/", "label": "NENA board"}, {"url": "https://www.massnena.org/jobs-1-1", "label": "MassNENA"}, {"url": "https://www.everbridge.com/about/careers/", "label": "Everbridge (Burlington, MA)"}, {"url": "https://www.indeed.com/q-motorola-solutions-l-massachusetts-jobs.html", "label": "Motorola Solutions"}], "filterNote": "Lead with named product experience (Motorola CallWorks, OMON) in any application here."}, {"num": 5, "id": "desktop", "title": "Desktop Support / End User Support", "sub": "Direct match — six roles on your resume touch this exact work", "postings": [{"title": "End User Support Specialist", "company": "Barings — Boston, MA", "meta": "$85,900–$137,500 (posted range) · On-site/Hybrid", "url": "https://www.simplyhired.com/search?q=desktop+support+specialist&l=boston,+ma", "desc": "First and second-line support for end users, resolving technical issues and maintaining high service standards — direct overlap with your Rue La La and Harvard SPH experience. Link goes to the search result; open it and look for the Barings listing specifically since direct-apply links go stale fast on aggregators."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=desktop+support&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=Desktop%20Support&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Desktop-Support/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://www.glassdoor.com/Job/boston-desktop-support-jobs-SRCH_IL.0,6_IC1154532_KO7,22.htm", "label": "Glassdoor"}], "filterNote": "Watch pay carefully in this lane — many desktop support postings run $50K–$70K; filter for \"End User Support,\" \"IT Support Engineer,\" or \"Senior\" to stay near your target."}, {"num": 6, "id": "ngo", "title": "UN / NGO / International", "sub": "Honest flag: most open roles are field-based, local-salary, or need prior INGO experience", "postings": [], "snapshot": "Checked ReliefWeb/UNjobs directly — current ICT/IT Support postings are based in Ethiopia, Kenya, Syria, Philippines, etc., paying local rates well under $80K USD-equivalent, or explicitly require prior NGO/INGO field experience. No US-based, $80K+ match right now. Worth checking periodically — this shifts often — but don't expect this lane to move as fast as the others.", "feeds": [{"url": "https://careers.un.org/jobopening", "label": "UN Careers portal"}, {"url": "https://reliefweb.int/jobs", "label": "ReliefWeb Jobs"}, {"url": "https://www.impactpool.org/jobs/c/remote-ngo-jobs", "label": "Impactpool (remote NGO)"}, {"url": "https://unjobs.org/skills/ict", "label": "UNjobs.org (ICT filter)"}], "filterNote": "Filter ReliefWeb/UNjobs by country = United States for any chance at a US-based salary. Field Service (GS) category roles are your best formal fit — see earlier conversation on the nationality restriction for Haiti-based posts specifically."}, {"num": 7, "id": "mdcs", "title": "Medical Device Cybersecurity / HTM", "sub": "Combines your Zeiss field service + BCS 365 security background — narrow niche, structural workforce shortage, low competition", "postings": [{"title": "BMET Cybersecurity Specialist", "company": "Sodexo (Healthcare Technology Management Division) — MA hospital clients", "meta": "Sodexo rotates this exact title across client hospitals nationally (had a Hyannis, MA / Boston-hospital posting) · check their careers page directly, not just aggregators", "url": "https://www.indeed.com/q-medical-device-cybersecurity-l-massachusetts-jobs.html", "desc": "Lead the collection of cybersecurity data in CMMS, conduct device risk assessments, manage vulnerability remediation/patching, and coordinate with hospital IT and device vendors. Your Zeiss change-control/audit-trail work and BCS 365 Sentinel/CrowdStrike/Qualys experience map directly onto this. <b style=\"color:var(--red)\">CySA+ not required</b> — Security+ plus hands-on device experience is enough to be competitive now."}], "snapshot": "Snapshot pulled Aug 20, 2026 — narrow niche; expect a handful of active MA postings at a time, not a high-volume lane. Also watch GE Healthcare, Philips, Siemens Healthineers, and TRIMEDX directly — the other major HTM/device-service contractors that staff this role.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=medical%20device%20cybersecurity&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-BMET-cybersecurity-jobs.html", "label": "Indeed: BMET cybersecurity (national — rotates through MA)"}, {"url": "https://www.himss.org/jobs", "label": "HIMSS Job Mine"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=medical+device+cybersecurity&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Try also: \"healthcare IoT security\", \"clinical engineering cybersecurity\". Widen location to New England if MA results are thin — this lane moves in bursts."}, {"num": 8, "id": "bmet", "title": "BMET / Clinical Engineering", "sub": "CBET certification path — formalizes your Zeiss device work; 30+ BMET programs closed in 5 years, only ~400 grads/yr vs ~7,300 annual openings", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet. Structural shortage means this is worth checking regularly even without a live hit.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=biomedical%20equipment%20technician&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-biomedical-equipment-technician-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.aami.org/careers/job-board", "label": "AAMI Job Board"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=BMET&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Lead with Zeiss CIRRUS OCT/HFA experience and FDA-regulated change-control work. Consider a BMET associate/certificate program (cuts CBET experience requirement from 4 years to 2)."}, {"num": 9, "id": "healthit", "title": "Healthcare IT / Epic Systems Analyst", "sub": "BLS: 15% growth 2024–2034 — \"much faster than average\"; median $107K, often employer-sponsored Epic cert", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=healthcare%20IT%20analyst&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-healthcare-it-analyst-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.himss.org/jobs", "label": "HIMSS Job Mine"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=Epic+analyst&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Employers frequently sponsor Epic certification after hire — don't screen yourself out for not having it yet."}, {"num": 10, "id": "cloudsec", "title": "Cloud Security Engineer", "sub": "Reactivates your Azure Fundamentals/AZ-500 background — highest ceiling of any lane ($130K–$225K)", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=cloud%20security%20engineer&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-cloud-security-engineer-l-boston,-ma-jobs.html", "label": "Indeed"}, {"url": "https://jobs.isc2.org/", "label": "ISC2 Job Board"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=cloud+security+engineer&location=Boston%2C+MA", "label": "ZipRecruiter"}], "filterNote": "Reactivate AZ-500 and finish CySA+ first — the credential pairing is what unlocks this lane's top end."}, {"num": 11, "id": "clinapp", "title": "Clinical Applications / Medical Device Specialist", "sub": "Closest lateral move from OCT field work — device fluency + client-facing training, not repair. $89K–$148K", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet. Weakest fit of the new lanes if outbound sales is involved — screen postings for base-heavy vs. commission-heavy comp before applying.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=clinical%20applications%20specialist&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-clinical-applications-specialist-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=clinical+specialist+medical+device&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Combines Clinical Applications Specialist and Medical Device Sales/Clinical Specialist — same buyer, same skill set, different comp structure per employer."}, {"num": 12, "id": "netqeng", "title": "Network Engineer", "sub": "Fastest to reactivate (CCNA refresh) — moderate ceiling ($90K–$110K), good fallback while pursuing higher-leverage lanes", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=network%20engineer&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-network-engineer-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=network+engineer&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Refresh CCNA — shortest path back into a paying role while longer-lead lanes (Cloud Security, Healthcare IT) develop."}]
+  const LANES = [{"num": 1, "id": "noc", "title": "NOC / IT Support / Systems", "sub": "Your strongest lane — 8 years NG911 infrastructure, NOC ops", "postings": [{"title": "NOC Technician", "company": "Granite Telecommunications — Quincy, MA", "meta": "~$50K–$69K (Glassdoor est.) · On-site", "url": "https://www.glassdoor.com/job-listing/noc-technician-granite-telecommunications-JV_IC1154667_KO0,14_KE15,41.htm?jl=1009919712219", "desc": "Monitors and troubleshoots client network infrastructure, manages a ticket queue, and works across SD-WAN, firewalls, and enterprise networking. CCNA or Network+ called out directly as qualifying certs. <b style=\"color:var(--red)\">Below your $80K target</b> — worth checking if it's a stepping stone toward their Cloud Ops / Senior roles."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=NOC+engineer&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=NOC%20Engineer&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=NOC+Engineer&location=Boston%2C+MA", "label": "ZipRecruiter"}, {"url": "https://www.simplyhired.com/search?q=noc+engineer&l=massachusetts", "label": "SimplyHired"}, {"url": "https://www.glassdoor.com/Job/jobs.htm?sc.keyword=NOC+engineer&locT=S&locId=1154532", "label": "Glassdoor"}], "filterNote": "Try also: \"network operations\", \"systems administrator\" — widen if results are thin."}, {"num": 2, "id": "field", "title": "Field Service Engineer", "sub": "Medical device / regulated equipment — direct match to Zeiss work", "postings": [{"title": "Field Service Engineer II (Medical Devices)", "company": "Boston Scientific — Boston, MA", "meta": "~$77K–$104K (market est.) · Northeast region travel", "url": "https://jobs.bostonscientific.com/job/Boston-Field-Service-Engineer-II-(Medical-Devices)-Boston,-MA-MA-02101/1405621600/", "desc": "Supports Cardiovascular Division products (IVUS, AngioJet, FARAPULSE, and similar systems) across the Northeast. Requires an Associate's degree/technical diploma plus 1 year experience — <b style=\"color:var(--green)\">or an equivalent combination of training and work experience</b>, which directly fits your background."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=field+service+engineer+medical+device&l=Massachusetts", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=Field%20Service%20Engineer%20Medical%20Device&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Field-Service-Engineer/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://jobs.bostonscientific.com/search/?q=field+service", "label": "Boston Scientific"}, {"url": "https://www.glassdoor.com/Job/massachusetts-field-service-engineer-jobs-SRCH_IL.0,13_IS3399_KO14,36.htm", "label": "Glassdoor"}], "filterNote": "Also check GE HealthCare, Philips, Siemens Healthineers, Canon Medical career pages directly.", "companies": ["GE HealthCare", "Philips", "Siemens Healthineers", "Canon Medical"]}, {"num": 3, "id": "cyber", "title": "Cybersecurity / SOC Analyst", "sub": "Apply Tier 1 / Associate level — matches your BCS 365 experience", "postings": [{"title": "Cybersecurity Analyst / SOC Analyst (multiple levels)", "company": "State Street — Quincy, MA", "meta": "~$80K–$120K (market est.) · Hybrid", "url": "https://www.glassdoor.com/Job/boston-soc-analyst-jobs-SRCH_IL.0,6_IC1154532_KO7,18.htm", "desc": "State Street's Fusion Center runs 24/7 threat detection and response; they post multiple SOC tiers regularly. <b style=\"color:var(--amber)\">Filter for \"Cybersecurity Analyst\" or entry associate-level</b> — the Lead/Senior postings want 4+ years dedicated SOC/IR experience, above your current level."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=SOC+analyst&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=SOC%20Analyst%20Tier%201&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Soc-Analyst-Tier-1/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://www.glassdoor.com/Job/boston-entry-level-cyber-security-jobs-SRCH_IL.0,6_IC1154532_KO7,33.htm", "label": "Glassdoor"}], "filterNote": "Search \"Tier 1\" or \"Associate\" explicitly — avoids senior-level mismatches."}, {"num": 4, "id": "e911", "title": "E911 / NG911 Niche", "sub": "Specialized — thin but high-fit when it hits", "postings": [], "snapshot": "Nothing matching your Technical/IT profile is currently open on NENA/MassNENA — this lane is link-only until something posts. Check back regularly; it moves in bursts.", "feeds": [{"url": "https://www.ziprecruiter.com/Jobs/E911-Engineer", "label": "ZipRecruiter (E911)"}, {"url": "https://www.indeed.com/q-Ng911-jobs.html", "label": "Indeed (NG911)"}, {"url": "https://jobs.nena.org/jobs/state/massachusetts/", "label": "NENA board"}, {"url": "https://www.massnena.org/jobs-1-1", "label": "MassNENA"}, {"url": "https://www.everbridge.com/about/careers/", "label": "Everbridge (Burlington, MA)"}, {"url": "https://www.indeed.com/q-motorola-solutions-l-massachusetts-jobs.html", "label": "Motorola Solutions"}], "filterNote": "Lead with named product experience (Motorola CallWorks, OMON) in any application here.", "companies": ["Everbridge", "Motorola Solutions"]}, {"num": 5, "id": "desktop", "title": "Desktop Support / End User Support", "sub": "Direct match — six roles on your resume touch this exact work", "postings": [{"title": "End User Support Specialist", "company": "Barings — Boston, MA", "meta": "$85,900–$137,500 (posted range) · On-site/Hybrid", "url": "https://www.simplyhired.com/search?q=desktop+support+specialist&l=boston,+ma", "desc": "First and second-line support for end users, resolving technical issues and maintaining high service standards — direct overlap with your Rue La La and Harvard SPH experience. Link goes to the search result; open it and look for the Barings listing specifically since direct-apply links go stale fast on aggregators."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=desktop+support&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=Desktop%20Support&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Desktop-Support/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://www.glassdoor.com/Job/boston-desktop-support-jobs-SRCH_IL.0,6_IC1154532_KO7,22.htm", "label": "Glassdoor"}], "filterNote": "Watch pay carefully in this lane — many desktop support postings run $50K–$70K; filter for \"End User Support,\" \"IT Support Engineer,\" or \"Senior\" to stay near your target."}, {"num": 6, "id": "ngo", "title": "UN / NGO / International", "sub": "Honest flag: most open roles are field-based, local-salary, or need prior INGO experience", "postings": [], "snapshot": "Checked ReliefWeb/UNjobs directly — current ICT/IT Support postings are based in Ethiopia, Kenya, Syria, Philippines, etc., paying local rates well under $80K USD-equivalent, or explicitly require prior NGO/INGO field experience. No US-based, $80K+ match right now. Worth checking periodically — this shifts often — but don't expect this lane to move as fast as the others.", "feeds": [{"url": "https://careers.un.org/jobopening", "label": "UN Careers portal"}, {"url": "https://inspira.un.org/", "label": "UN Inspira"}, {"url": "https://reliefweb.int/jobs", "label": "ReliefWeb Jobs"}, {"url": "https://www.impactpool.org/jobs/c/remote-ngo-jobs", "label": "Impactpool (remote NGO)"}, {"url": "https://unjobs.org/skills/ict", "label": "UNjobs.org (ICT filter)"}], "filterNote": "Filter ReliefWeb/UNjobs by country = United States for any chance at a US-based salary. Field Service (GS) category roles are your best formal fit — see earlier conversation on the nationality restriction for Haiti-based posts specifically."}, {"num": 7, "id": "mdcs", "title": "Medical Device Cybersecurity / HTM", "sub": "Combines your Zeiss field service + BCS 365 security background — narrow niche, structural workforce shortage, low competition", "postings": [{"title": "BMET Cybersecurity Specialist", "company": "Sodexo (Healthcare Technology Management Division) — MA hospital clients", "meta": "Sodexo rotates this exact title across client hospitals nationally (had a Hyannis, MA / Boston-hospital posting) · check their careers page directly, not just aggregators", "url": "https://www.indeed.com/q-medical-device-cybersecurity-l-massachusetts-jobs.html", "desc": "Lead the collection of cybersecurity data in CMMS, conduct device risk assessments, manage vulnerability remediation/patching, and coordinate with hospital IT and device vendors. Your Zeiss change-control/audit-trail work and BCS 365 Sentinel/CrowdStrike/Qualys experience map directly onto this. <b style=\"color:var(--red)\">CySA+ not required</b> — Security+ plus hands-on device experience is enough to be competitive now."}], "snapshot": "Snapshot pulled Aug 20, 2026 — narrow niche; expect a handful of active MA postings at a time, not a high-volume lane. Also watch GE Healthcare, Philips, Siemens Healthineers, and TRIMEDX directly — the other major HTM/device-service contractors that staff this role.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=medical%20device%20cybersecurity&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-BMET-cybersecurity-jobs.html", "label": "Indeed: BMET cybersecurity (national — rotates through MA)"}, {"url": "https://www.himss.org/jobs", "label": "HIMSS Job Mine"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=medical+device+cybersecurity&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Try also: \"healthcare IoT security\", \"clinical engineering cybersecurity\". Widen location to New England if MA results are thin — this lane moves in bursts.", "companies": ["Sodexo (HTM Division)", "GE Healthcare", "Philips", "Siemens Healthineers", "TRIMEDX"]}, {"num": 8, "id": "bmet", "title": "BMET / Clinical Engineering", "sub": "CBET certification path — formalizes your Zeiss device work; 30+ BMET programs closed in 5 years, only ~400 grads/yr vs ~7,300 annual openings", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet. Structural shortage means this is worth checking regularly even without a live hit.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=biomedical%20equipment%20technician&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-biomedical-equipment-technician-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.aami.org/careers/job-board", "label": "AAMI Job Board"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=BMET&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Lead with Zeiss CIRRUS OCT/HFA experience and FDA-regulated change-control work. Consider a BMET associate/certificate program (cuts CBET experience requirement from 4 years to 2)."}, {"num": 9, "id": "healthit", "title": "Healthcare IT / Epic Systems Analyst", "sub": "BLS: 15% growth 2024–2034 — \"much faster than average\"; median $107K, often employer-sponsored Epic cert", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=healthcare%20IT%20analyst&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-healthcare-it-analyst-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.himss.org/jobs", "label": "HIMSS Job Mine"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=Epic+analyst&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Employers frequently sponsor Epic certification after hire — don't screen yourself out for not having it yet."}, {"num": 10, "id": "cloudsec", "title": "Cloud Security Engineer", "sub": "Reactivates your Azure Fundamentals/AZ-500 background — highest ceiling of any lane ($130K–$225K)", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=cloud%20security%20engineer&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-cloud-security-engineer-l-boston,-ma-jobs.html", "label": "Indeed"}, {"url": "https://jobs.isc2.org/", "label": "ISC2 Job Board"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=cloud+security+engineer&location=Boston%2C+MA", "label": "ZipRecruiter"}], "filterNote": "Reactivate AZ-500 and finish CySA+ first — the credential pairing is what unlocks this lane's top end."}, {"num": 11, "id": "clinapp", "title": "Clinical Applications / Medical Device Specialist", "sub": "Closest lateral move from OCT field work — device fluency + client-facing training, not repair. $89K–$148K", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet. Weakest fit of the new lanes if outbound sales is involved — screen postings for base-heavy vs. commission-heavy comp before applying.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=clinical%20applications%20specialist&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-clinical-applications-specialist-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=clinical+specialist+medical+device&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Combines Clinical Applications Specialist and Medical Device Sales/Clinical Specialist — same buyer, same skill set, different comp structure per employer."}, {"num": 12, "id": "netqeng", "title": "Network Engineer", "sub": "Fastest to reactivate (CCNA refresh) — moderate ceiling ($90K–$110K), good fallback while pursuing higher-leverage lanes", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=network%20engineer&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-network-engineer-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=network+engineer&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Refresh CCNA — shortest path back into a paying role while longer-lead lanes (Cloud Security, Healthcare IT) develop."}]
 ;
 
   let liveData = {};       // laneId -> { jobs, error }
+  let starredPostings = {};   // { jobId: {id, title, company, url, meta, laneId, laneTitle} }
+  let newPostings = [];       // [{id, title, company, url, meta, laneId, laneTitle, created}]
   let activeLane = LANES[0].id;
   let leads = [];
 
@@ -462,9 +496,12 @@
       liveHtml = `<div class="pane-empty">No live results from Adzuna for this lane right now.</div>`;
     } else {
       liveHtml = live.jobs.map(j => postingCardHtml({
+        id: j.id,
         title: j.title, company: `${j.company || 'Unknown company'} — ${j.location || ''}`,
         meta: `${j.salaryMin ? '$' + Math.round(j.salaryMin).toLocaleString() : '?'}${j.salaryMax ? '–$' + Math.round(j.salaryMax).toLocaleString() : ''} · via Adzuna`,
-        url: j.url, desc: j.description ? j.description + '…' : ''
+        url: j.url, desc: j.description ? j.description + '…' : '',
+        created: j.created,
+        laneTitle: lane.title.split(' / ')[0].split(' (')[0],
       }, lane.id, true)).join('');
     }
 
@@ -489,6 +526,7 @@
       </div>
       <div class="below-panes">
         <div class="feeds-row">${feedsHtml}</div>
+        <div class="companies-row" id="companiesRow"></div>
         <div class="filter-note">${escapeHtml(lane.filterNote)}</div>
       </div>
     `;
@@ -508,18 +546,71 @@
         prefillLead(p.title, p.company, p.url, lane.id);
       });
     });
+    el.querySelectorAll('[data-star-inline]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const job = JSON.parse(btn.getAttribute('data-star-inline'));
+        toggleStar(job);
+      });
+    });
+    renderCompaniesChecklist(lane);
+  }
+
+  // ===== Companies to watch (per lane) =====
+  const COMPANIES_CHECKED_KEY = 'companies-checked-v1';
+  function loadCompaniesChecked() {
+    try { return JSON.parse(localStorage.getItem(COMPANIES_CHECKED_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function saveCompaniesChecked(data) {
+    try { localStorage.setItem(COMPANIES_CHECKED_KEY, JSON.stringify(data)); } catch (e) {}
+  }
+  function renderCompaniesChecklist(lane) {
+    const el = document.getElementById('companiesRow');
+    if (!lane.companies || !lane.companies.length) { el.innerHTML = ''; return; }
+    const checked = loadCompaniesChecked();
+    const laneChecked = checked[lane.id] || {};
+    el.innerHTML = `<span class="companies-label">Companies to watch:</span>` + lane.companies.map(c => {
+      const isChecked = !!laneChecked[c];
+      return `<button class="company-chip ${isChecked ? 'checked' : ''}" data-company="${escapeAttr(c)}">${isChecked ? '✓ ' : ''}${escapeHtml(c)}</button>`;
+    }).join('');
+    el.querySelectorAll('[data-company]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const all = loadCompaniesChecked();
+        if (!all[lane.id]) all[lane.id] = {};
+        const c = btn.getAttribute('data-company');
+        all[lane.id][c] = !all[lane.id][c];
+        saveCompaniesChecked(all);
+        renderCompaniesChecklist(lane);
+      });
+    });
+  }
+
+  function postedAgoLabel(createdStr) {
+    if (!createdStr) return '';
+    const created = new Date(createdStr);
+    const days = Math.round((new Date() - created) / 86400000);
+    if (days <= 0) return 'Posted today';
+    if (days === 1) return 'Posted 1 day ago';
+    if (days <= 30) return `Posted ${days} days ago`;
+    return `Posted ${Math.round(days / 30)} mo ago`;
   }
 
   function postingCardHtml(p, laneId, isLive) {
     const trackPayload = escapeAttr(JSON.stringify({ title: p.title, company: p.company, url: p.url }));
+    const isStarred = p.id && starredPostings[p.id];
+    const freshness = isLive && p.created ? postedAgoLabel(p.created) : '';
+    const starPayload = p.id ? escapeAttr(JSON.stringify({
+      id: p.id, title: p.title, company: p.company, url: p.url, meta: p.meta,
+      laneId, laneTitle: p.laneTitle || laneId,
+    })) : '';
     return `
       <div class="posting-card">
         <div class="posting-top">
           <div>
             <div class="posting-title">${escapeHtml(p.title)}</div>
             <div class="posting-company">${escapeHtml(p.company)}</div>
-            ${p.meta ? `<div class="posting-meta">${escapeHtml(p.meta)}</div>` : ''}
+            ${p.meta ? `<div class="posting-meta">${escapeHtml(p.meta)}${freshness ? ' · ' + escapeHtml(freshness) : ''}</div>` : ''}
           </div>
+          ${p.id ? `<button class="star-btn ${isStarred ? 'on' : ''}" data-star-inline="${starPayload}" title="${isStarred ? 'Unstar' : 'Star'}">★</button>` : ''}
         </div>
         ${p.desc ? `<div class="posting-desc">${p.desc}</div>` : ''}
         <div class="posting-actions">
@@ -543,18 +634,24 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       let total = 0;
+      const jobsByLane = {};
       Object.entries(data).forEach(([laneKey, laneResult]) => {
         liveData[laneKey] = laneResult.error ? { error: laneResult.error } : { jobs: laneResult.jobs };
+        jobsByLane[laneKey] = laneResult.jobs || [];
         total += (laneResult.jobs || []).length;
       });
+      computeNewSinceLastVisit(jobsByLane);
       setApiStatus(`✓ Live — ${total} postings loaded`, true);
       renderNav();
       renderMain();
+      renderWeekStrip();
     } catch (e) {
       setApiStatus(`Static snapshot only — live API unreachable (${e.message})`, false);
     }
   }
   document.getElementById('fetchLiveBtn').addEventListener('click', fetchLivePostings);
+  loadWeekState();
+  renderWeekStrip();
   fetchLivePostings();
 
   // ===== Action bar =====
@@ -626,6 +723,7 @@
 
   // ===== Lead tracker =====
   const LEADS_KEY = 'leads-v1';
+  const STALE_DAYS = 10;
   function laneLabel(id) {
     const l = LANES.find(x => x.id === id);
     return l ? l.title.split(' / ')[0].split(' (')[0] : id;
@@ -638,16 +736,38 @@
   async function persistLeads() {
     try { localStorage.setItem(LEADS_KEY, JSON.stringify(leads)); } catch (e) {}
   }
+  function daysSince(iso) {
+    if (!iso) return null;
+    return Math.round((new Date() - new Date(iso)) / 86400000);
+  }
+  function renderStaleNudge() {
+    const el = document.getElementById('staleNudge');
+    const staleCount = leads.filter(l => {
+      const d = daysSince(l.lastStatusChange || l.dateAdded);
+      return d !== null && d >= STALE_DAYS && l.status !== 'Rejected';
+    }).length;
+    if (staleCount > 0) {
+      el.style.display = 'block';
+      el.textContent = `⚠ ${staleCount} lead${staleCount > 1 ? 's' : ''} ${staleCount > 1 ? "haven't" : "hasn't"} moved in ${STALE_DAYS}+ days`;
+    } else {
+      el.style.display = 'none';
+    }
+  }
   function renderLeads(flashIdx) {
+    renderStaleNudge();
     const el = document.getElementById('leadsList');
     if (!leads.length) {
       el.innerHTML = '<div class="tracker-empty">No leads saved yet — add one above, or click "+ Track" on any posting.</div>';
       return;
     }
-    el.innerHTML = leads.map((lead, i) => `
-      <div class="lead ${i === flashIdx ? 'lead-flash' : ''}">
+    el.innerHTML = leads.map((lead, i) => {
+      const staleDays = daysSince(lead.lastStatusChange || lead.dateAdded);
+      const isStale = staleDays !== null && staleDays >= STALE_DAYS && lead.status !== 'Rejected';
+      return `
+      <div class="lead ${i === flashIdx ? 'lead-flash' : ''} ${isStale ? 'stale' : ''}">
         <div>${lead.url ? `<a href="${escapeAttr(lead.url)}" target="_blank">${escapeHtml(lead.title || 'Untitled')}</a>` : escapeHtml(lead.title || 'Untitled')}</div>
         <div class="company">${escapeHtml(lead.company || '—')} · ${escapeHtml(laneLabel(lead.lane))}</div>
+        ${lead.resumeVersion ? `<div class="resume-tag">📄 ${escapeHtml(lead.resumeVersion)}</div>` : ''}
         <div class="lead-bottom">
           <select class="status-pill status-${lead.status}" data-idx="${i}" data-role="status">
             <option value="New" ${lead.status === 'New' ? 'selected' : ''}>New</option>
@@ -657,9 +777,12 @@
           </select>
           <button class="del-btn" data-idx="${i}" data-role="del">Remove</button>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     el.querySelectorAll('[data-role="status"]').forEach(sel => sel.addEventListener('change', async e => {
-      leads[parseInt(e.target.getAttribute('data-idx'))].status = e.target.value;
+      const idx = parseInt(e.target.getAttribute('data-idx'));
+      leads[idx].status = e.target.value;
+      leads[idx].lastStatusChange = new Date().toISOString();
       await persistLeads(); renderLeads();
     }));
     el.querySelectorAll('[data-role="del"]').forEach(btn => btn.addEventListener('click', async e => {
@@ -667,6 +790,28 @@
       await persistLeads(); renderLeads();
     }));
   }
+
+  function exportLeadsCsv() {
+    if (!leads.length) { showToast('No leads to export yet'); return; }
+    const headers = ['Title', 'Company', 'Lane', 'Status', 'Resume Version', 'URL', 'Date Added', 'Last Status Change'];
+    const rows = leads.map(l => [
+      l.title || '', l.company || '', laneLabel(l.lane), l.status || '',
+      l.resumeVersion || '', l.url || '', l.dateAdded || '', l.lastStatusChange || '',
+    ]);
+    const csvEscape = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `job-search-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`✓ Exported ${leads.length} leads to CSV`);
+  }
+  document.getElementById('exportCsvBtn').addEventListener('click', exportLeadsCsv);
 
   function prefillLead(title, company, url, laneId) {
     document.getElementById('inTitle').value = title || '';
@@ -682,13 +827,16 @@
     const company = document.getElementById('inCompany').value.trim();
     const url = document.getElementById('inUrl').value.trim();
     const lane = document.getElementById('inLane').value;
+    const resumeVersion = document.getElementById('inResume').value;
     if (!title && !company && !url) return;
-    leads.unshift({ title, company, url, lane, status: 'New', dateAdded: new Date().toISOString() });
+    const now = new Date().toISOString();
+    leads.unshift({ title, company, url, lane, resumeVersion, status: 'New', dateAdded: now, lastStatusChange: now });
     await persistLeads();
     renderLeads(0);
     document.getElementById('inTitle').value = '';
     document.getElementById('inCompany').value = '';
     document.getElementById('inUrl').value = '';
+    document.getElementById('inResume').value = '';
   });
 
   function initLaneSelect() {
@@ -710,66 +858,135 @@
   function escapeAttr(str) { return (str || '').replace(/"/g, '&quot;'); }
 
 
-  const CURATED_DEFAULT = [{"laneId": "noc", "laneTitle": "NOC", "title": "NOC Technician", "company": "Granite Telecommunications — Quincy, MA", "meta": "~$50K–$69K (Glassdoor est.) · On-site", "url": "https://www.glassdoor.com/job-listing/noc-technician-granite-telecommunications-JV_IC1154667_KO0,14_KE15,41.htm?jl=1009919712219", "desc": "Monitors and troubleshoots client network infrastructure, manages a ticket queue, and works across SD-WAN, firewalls, and enterprise networking. CCNA or Network+ called out directly as qualifying certs. <b style=\"color:var(--red)\">Below your $80K target</b> — worth checking if it's a stepping stone toward their Cloud Ops / Senior roles.", "postedDate": "Aug 19, 2026"}, {"laneId": "field", "laneTitle": "Field Service Engineer", "title": "Field Service Engineer II (Medical Devices)", "company": "Boston Scientific — Boston, MA", "meta": "~$77K–$104K (market est.) · Northeast region travel", "url": "https://jobs.bostonscientific.com/job/Boston-Field-Service-Engineer-II-(Medical-Devices)-Boston,-MA-MA-02101/1405621600/", "desc": "Supports Cardiovascular Division products (IVUS, AngioJet, FARAPULSE, and similar systems) across the Northeast. Requires an Associate's degree/technical diploma plus 1 year experience — <b style=\"color:var(--green)\">or an equivalent combination of training and work experience</b>, which directly fits your background.", "postedDate": "Aug 19, 2026"}, {"laneId": "cyber", "laneTitle": "Cybersecurity", "title": "Cybersecurity Analyst / SOC Analyst (multiple levels)", "company": "State Street — Quincy, MA", "meta": "~$80K–$120K (market est.) · Hybrid", "url": "https://www.glassdoor.com/Job/boston-soc-analyst-jobs-SRCH_IL.0,6_IC1154532_KO7,18.htm", "desc": "State Street's Fusion Center runs 24/7 threat detection and response; they post multiple SOC tiers regularly. <b style=\"color:var(--amber)\">Filter for \"Cybersecurity Analyst\" or entry associate-level</b> — the Lead/Senior postings want 4+ years dedicated SOC/IR experience, above your current level.", "postedDate": "Aug 19, 2026"}, {"laneId": "desktop", "laneTitle": "Desktop Support", "title": "End User Support Specialist", "company": "Barings — Boston, MA", "meta": "$85,900–$137,500 (posted range) · On-site/Hybrid", "url": "https://www.simplyhired.com/search?q=desktop+support+specialist&l=boston,+ma", "desc": "First and second-line support for end users, resolving technical issues and maintaining high service standards — direct overlap with your Rue La La and Harvard SPH experience. Link goes to the search result; open it and look for the Barings listing specifically since direct-apply links go stale fast on aggregators.", "postedDate": "Aug 19, 2026"}, {"laneId": "mdcs", "laneTitle": "Medical Device Cybersecurity", "title": "BMET Cybersecurity Specialist", "company": "Sodexo (Healthcare Technology Management Division) — MA hospital clients", "meta": "Sodexo rotates this exact title across client hospitals nationally (had a Hyannis, MA / Boston-hospital posting) · check their careers page directly, not just aggregators", "url": "https://www.indeed.com/q-medical-device-cybersecurity-l-massachusetts-jobs.html", "desc": "Lead the collection of cybersecurity data in CMMS, conduct device risk assessments, manage vulnerability remediation/patching, and coordinate with hospital IT and device vendors. Your Zeiss change-control/audit-trail work and BCS 365 Sentinel/CrowdStrike/Qualys experience map directly onto this. <b style=\"color:var(--red)\">CySA+ not required</b> — Security+ plus hands-on device experience is enough to be competitive now.", "postedDate": "Aug 20, 2026"}];
-  let CURATED = CURATED_DEFAULT;
-  let curatedRefreshedAt = null; // null = still showing the original hand-researched set
+  // ===== This Week: starred postings + new-since-last-visit =====
+  // Replaces the old paid AI-search "Curated Picks" strip. Both pieces here
+  // are entirely free and automatic — no API calls, just localStorage plus
+  // a diff against what Live-Adzuna already fetches.
+  const STARRED_KEY = 'starred-postings-v1';
+  const SEEN_IDS_KEY = 'seen-job-ids-v1';
+  const NEW_POSTINGS_KEY = 'new-postings-v1';
+  const SEEN_IDS_CAP = 800;
+  const NEW_POSTINGS_CAP = 15;
 
-  const LANE_ID_LIST = "noc, field, cyber, e911, desktop, ngo, mdcs, bmet, healthit, cloudsec, clinapp, netqeng";
-
-  const CURATED_KEY = 'curated-picks-v2';
-
-  async function loadCuratedFromStorage() {
-    try {
-      const raw = localStorage.getItem(CURATED_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        CURATED = parsed.items;
-        curatedRefreshedAt = parsed.refreshedAt;
-      }
-    } catch (e) { /* no saved refresh yet — keep CURATED_DEFAULT */ }
+  function loadWeekState() {
+    try { starredPostings = JSON.parse(localStorage.getItem(STARRED_KEY) || '{}'); } catch (e) { starredPostings = {}; }
+    try { newPostings = JSON.parse(localStorage.getItem(NEW_POSTINGS_KEY) || '[]'); } catch (e) { newPostings = []; }
   }
-  function persistCurated() {
-    try {
-      localStorage.setItem(CURATED_KEY, JSON.stringify({ items: CURATED, refreshedAt: curatedRefreshedAt }));
-    } catch (e) {}
+  function persistStarred() {
+    try { localStorage.setItem(STARRED_KEY, JSON.stringify(starredPostings)); } catch (e) {}
+  }
+  function persistNewPostings() {
+    try { localStorage.setItem(NEW_POSTINGS_KEY, JSON.stringify(newPostings)); } catch (e) {}
   }
 
-
-  function daysAgo(dateStr) {
-    const d = new Date(dateStr + ' 00:00:00');
-    const now = new Date();
-    return Math.round((now - d) / 86400000);
-  }
-
-  function renderCuratedStrip() {
-    const sub = document.getElementById('curatedSub');
-    if (curatedRefreshedAt) {
-      const when = new Date(curatedRefreshedAt);
-      const mins = Math.round((new Date() - when) / 60000);
-      const label = mins < 1 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.round(mins/60)}h ago`;
-      sub.textContent = `Refreshed by live web search · ${label} · click a card to jump to that lane`;
+  function toggleStar(job) {
+    if (starredPostings[job.id]) {
+      delete starredPostings[job.id];
     } else {
-      sub.textContent = 'Hand-researched postings — click a card to jump to that lane, or search for current ones';
+      starredPostings[job.id] = job;
+    }
+    persistStarred();
+    renderWeekStrip();
+    renderMain(); // refresh star icon state on the card itself
+  }
+
+  // Called after every live fetch. Compares this fetch's job ids against
+  // ids seen on prior fetches; anything new gets flagged and surfaced in
+  // the top strip. The seen-id set is capped so it doesn't grow forever.
+  function computeNewSinceLastVisit(allLaneResults) {
+    let seenIds = [];
+    try { seenIds = JSON.parse(localStorage.getItem(SEEN_IDS_KEY) || '[]'); } catch (e) { seenIds = []; }
+    const seenSet = new Set(seenIds);
+
+    const freshlyNew = [];
+    const allIdsThisFetch = [];
+
+    Object.entries(allLaneResults).forEach(([laneId, jobs]) => {
+      const lane = LANES.find(l => l.id === laneId);
+      (jobs || []).forEach(j => {
+        if (!j.id) return;
+        allIdsThisFetch.push(j.id);
+        if (!seenSet.has(j.id)) {
+          freshlyNew.push({
+            id: j.id, title: j.title,
+            company: `${j.company || 'Unknown company'} — ${j.location || ''}`,
+            url: j.url,
+            meta: `${j.salaryMin ? '$' + Math.round(j.salaryMin).toLocaleString() : '?'}${j.salaryMax ? '–$' + Math.round(j.salaryMax).toLocaleString() : ''} · via Adzuna`,
+            laneId, laneTitle: lane ? lane.title.split(' / ')[0].split(' (')[0] : laneId,
+            created: j.created,
+          });
+        }
+      });
+    });
+
+    // Only treat as "new" if we've actually seen a prior fetch before —
+    // otherwise the very first load would flag everything as new.
+    if (seenIds.length > 0 && freshlyNew.length) {
+      freshlyNew.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
+      newPostings = freshlyNew.slice(0, NEW_POSTINGS_CAP);
+      persistNewPostings();
     }
 
+    const mergedIds = Array.from(new Set([...allIdsThisFetch, ...seenIds])).slice(0, SEEN_IDS_CAP);
+    try { localStorage.setItem(SEEN_IDS_KEY, JSON.stringify(mergedIds)); } catch (e) {}
+  }
+
+  function clearNewBadges() {
+    newPostings = [];
+    persistNewPostings();
+    renderWeekStrip();
+  }
+
+  function renderWeekStrip() {
+    const sub = document.getElementById('curatedSub');
+    const starredList = Object.values(starredPostings);
+    const newIds = new Set(newPostings.map(p => p.id));
+    const starredIds = new Set(starredList.map(p => p.id));
+    // Merge, starred first, no duplicates if something is both starred and new
+    const combined = [
+      ...starredList.map(p => ({ ...p, _starred: true, _new: newIds.has(p.id) })),
+      ...newPostings.filter(p => !starredIds.has(p.id)).map(p => ({ ...p, _starred: false, _new: true })),
+    ];
+
+    sub.textContent = combined.length
+      ? `${starredList.length} starred · ${newPostings.length} new since last visit · click a card to jump to that lane`
+      : 'Star a posting from any lane, or check back after refreshing live results';
+
     const el = document.getElementById('curatedCards');
-    el.innerHTML = CURATED.map(c => {
-      const age = c.postedDate ? daysAgo(c.postedDate) : null;
-      const ageLabel = age === null ? '' : age === 0 ? 'today' : age === 1 ? '1 day old' : `${age} days old`;
-      const stale = age !== null && age > 14;
-      return `
-        <div class="curated-card" data-jump="${c.laneId}">
-          <div class="curated-card-top">
-            <span class="curated-lane-tag">${escapeHtml(c.laneTitle)}</span>
-            <span class="curated-age ${stale ? 'stale' : ''}">${c.postedDate ? escapeHtml(c.postedDate) : ''}${ageLabel ? ' · ' + ageLabel : ''}</span>
-          </div>
-          <div class="curated-card-title">${escapeHtml(c.title)}</div>
-          <div class="curated-card-company">${escapeHtml(c.company)}</div>
-          <div class="curated-card-meta">${escapeHtml(c.meta)}</div>
-        </div>`;
-    }).join('');
+    if (!combined.length) {
+      el.innerHTML = `<div class="pane-empty" style="padding:14px 4px;">Nothing here yet — star a posting from any lane's Live results, or click "Refresh Live" to check for new ones.</div>`;
+      document.getElementById('clearNewBtn').style.display = 'none';
+      return;
+    }
+    document.getElementById('clearNewBtn').style.display = newPostings.length ? 'inline-block' : 'none';
+
+    el.innerHTML = combined.map(c => `
+      <div class="curated-card" data-jump="${c.laneId}">
+        <div class="curated-card-top">
+          <span class="curated-lane-tag">${escapeHtml(c.laneTitle)}</span>
+          <span style="display:flex; gap:6px; align-items:center;">
+            ${c._new ? '<span class="curated-age" style="color:var(--teal);">NEW</span>' : ''}
+            <button class="star-btn ${c._starred ? 'on' : ''}" data-star="${escapeAttr(c.id)}" title="${c._starred ? 'Unstar' : 'Star'}">★</button>
+          </span>
+        </div>
+        <div class="curated-card-title">${escapeHtml(c.title)}</div>
+        <div class="curated-card-company">${escapeHtml(c.company)}</div>
+        <div class="curated-card-meta">${escapeHtml(c.meta)}</div>
+      </div>`).join('');
+
     el.querySelectorAll('[data-jump]').forEach(card => {
-      card.addEventListener('click', () => selectLane(card.getAttribute('data-jump')));
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('[data-star]')) return; // star click shouldn't also navigate
+        selectLane(card.getAttribute('data-jump'));
+      });
+    });
+    el.querySelectorAll('[data-star]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-star');
+        const item = combined.find(c => c.id === id);
+        if (item) toggleStar(item);
+      });
     });
   }
 
@@ -778,40 +995,7 @@
     const collapsed = cards.classList.toggle('collapsed');
     e.target.textContent = collapsed ? '+ Expand' : '– Collapse';
   });
-
-  document.getElementById('refreshCuratedBtn').addEventListener('click', refreshCuratedFromAI);
-
-  async function refreshCuratedFromAI() {
-    const btn = document.getElementById('refreshCuratedBtn');
-    const originalLabel = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = '🔎 Searching…';
-    btn.style.opacity = '0.6';
-
-    try {
-      const res = await fetch('/api/scout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'postings' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-
-      CURATED = data.items;
-      curatedRefreshedAt = data.refreshedAt;
-      persistCurated();
-      renderCuratedStrip();
-      showToast(data.fromCache
-        ? `✓ Loaded ${data.items.length} postings from cache (no new search cost — refreshed within the last 12h)`
-        : `✓ Searched live — ${data.items.length} current postings found`);
-    } catch (e) {
-      showToast(`Refresh failed: ${e.message}`);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = originalLabel;
-      btn.style.opacity = '1';
-    }
-  }
+  document.getElementById('clearNewBtn').addEventListener('click', clearNewBadges);
 
   // ===== Scout Chat =====
   const SCOUT_CHAT_KEY = 'scout-chat-v1';
@@ -862,58 +1046,10 @@
       "Is there demand for this outside Massachusetts?",
       "What's the fastest one to actually land?",
     ];
-    document.getElementById('scoutQuickRow').innerHTML =
-      `<div class="scout-chip" id="scoutFindPostingsChip" style="border-color:var(--amber-dim); color:var(--amber);">🔎 Find current postings</div>` +
-      chips.map(c => `<div class="scout-chip">${escapeHtml(c)}</div>`).join('');
+    document.getElementById('scoutQuickRow').innerHTML = chips.map(c => `<div class="scout-chip">${escapeHtml(c)}</div>`).join('');
     document.querySelectorAll('.scout-chip').forEach(chip => {
-      if (chip.id === 'scoutFindPostingsChip') return; // wired separately below
       chip.addEventListener('click', () => sendScoutMessage(chip.textContent));
     });
-    document.getElementById('scoutFindPostingsChip').addEventListener('click', findPostingsFromChat);
-  }
-
-  async function findPostingsFromChat() {
-    document.getElementById('scoutModalSub').textContent = 'Searching for postings…';
-    const el = document.getElementById('scoutMsgs');
-    scoutHistory.push({ role: 'user', content: 'Find current postings' });
-    renderScoutMsgs();
-    const thinkId = 'scout-think-' + Date.now();
-    el.insertAdjacentHTML('beforeend', `
-      <div class="scout-msg-bot" id="${thinkId}">
-        <div class="scout-msg-bot-label">✦ SCOUT</div>
-        <div class="scout-msg-bot-body"><div class="scout-thinking"><span></span><span></span><span></span></div></div>
-      </div>`);
-    el.scrollTop = el.scrollHeight;
-
-    try {
-      const res = await fetch('/api/scout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'postings' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-
-      CURATED = data.items;
-      curatedRefreshedAt = data.refreshedAt;
-      persistCurated();
-      renderCuratedStrip();
-
-      const summary = data.fromCache
-        ? `Pulled ${data.items.length} postings from the cache (searched within the last 12h, no new cost) — updated the **Curated Picks** strip above. Titles: ${data.items.map(i => i.title).join(', ')}.`
-        : `Searched live and found ${data.items.length} current postings — updated the **Curated Picks** strip above. Titles: ${data.items.map(i => i.title).join(', ')}.`;
-      scoutHistory.push({ role: 'assistant', content: summary });
-      persistScoutHistory();
-      renderScoutMsgs();
-      document.getElementById('scoutModalSub').textContent = 'Ready — full background loaded';
-    } catch (e) {
-      document.getElementById(thinkId).outerHTML = `
-        <div class="scout-msg-bot">
-          <div class="scout-msg-bot-label">✦ SCOUT</div>
-          <div class="scout-msg-bot-body"><p style="color:var(--red)">Search failed: ${escapeHtml(e.message)}</p></div>
-        </div>`;
-      document.getElementById('scoutModalSub').textContent = 'Error — try again';
-    }
   }
 
   async function sendScoutMessage(text) {
@@ -995,7 +1131,6 @@
   renderMain();
   updateNavChecks();
   loadLeads();
-  loadCuratedFromStorage().then(renderCuratedStrip);
 </script>
 </body>
 </html>
