@@ -101,6 +101,22 @@ const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours — keeps Adzuna calls low o
 // In-memory cache: { [lane]: { fetchedAt, jobs: [...] } }
 const cache = {};
 
+// All Adzuna calls across the whole app funnel through this single queue,
+// one request at a time with a short gap between them. Without this, firing
+// 11 lanes at once (via /api/jobs/all) — each now making 1-3 requests since
+// the OR-phrase split — bursts 20+ simultaneous requests and trips Adzuna's
+// rate limit (429). This trades a little speed for actually working.
+let adzunaQueueTail = Promise.resolve();
+const ADZUNA_REQUEST_GAP_MS = 300;
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+function queueAdzunaCall(fn) {
+  const runNow = adzunaQueueTail.then(() => fn());
+  adzunaQueueTail = runNow.then(() => sleep(ADZUNA_REQUEST_GAP_MS), () => sleep(ADZUNA_REQUEST_GAP_MS));
+  return runNow;
+}
+
 async function fetchOnePhrase(phrase, where) {
   const url = new URL(`https://api.adzuna.com/v1/api/jobs/us/search/1`);
   url.searchParams.set('app_id', APP_ID);
@@ -111,23 +127,25 @@ async function fetchOnePhrase(phrase, where) {
   url.searchParams.set('sort_by', 'date');
   url.searchParams.set('content-type', 'application/json');
 
-  const res = await fetch(url.toString());
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Adzuna API error ${res.status}: ${text.slice(0, 300)}`);
-  }
-  const data = await res.json();
-  return (data.results || []).map(j => ({
-    id: j.id,
-    title: j.title,
-    company: j.company && j.company.display_name,
-    location: j.location && j.location.display_name,
-    salaryMin: j.salary_min || null,
-    salaryMax: j.salary_max || null,
-    created: j.created,
-    url: j.redirect_url,
-    description: (j.description || '').slice(0, 280),
-  }));
+  return queueAdzunaCall(async () => {
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Adzuna API error ${res.status}: ${text.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return (data.results || []).map(j => ({
+      id: j.id,
+      title: j.title,
+      company: j.company && j.company.display_name,
+      location: j.location && j.location.display_name,
+      salaryMin: j.salary_min || null,
+      salaryMax: j.salary_max || null,
+      created: j.created,
+      url: j.redirect_url,
+      description: (j.description || '').slice(0, 280),
+    }));
+  });
 }
 
 // Adzuna's `what` param does a plain keyword/phrase match — it has no
