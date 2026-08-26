@@ -212,6 +212,55 @@
   .nav-check-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
   .nav-check-dot.checked { background: var(--green); }
   .nav-divider { border-top: 1px solid var(--line); margin: 8px 14px; }
+  .nav-item.all-lanes .nav-num { color: var(--amber); }
+  .nav-item.dim .nav-label { color: var(--text-faint); }
+  .nav-count.zero { color: var(--text-faint); background: transparent; border: 1px solid var(--line); }
+
+  /* ===== Filter bar ===== */
+  .filter-bar {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; margin-top: 14px;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .filter-group label {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-faint);
+  }
+  .filter-group select, .filter-group input[type="text"] {
+    background: var(--bg); border: 1px solid var(--line); color: var(--text);
+    font-family: var(--sans); font-size: 12px; padding: 6px 9px; border-radius: 5px;
+  }
+  .filter-group input[type="text"] { min-width: 180px; }
+  .filter-group select:focus, .filter-group input:focus { outline: none; border-color: var(--amber-dim); }
+  .filter-check {
+    display: flex; align-items: center; gap: 5px; font-family: var(--mono);
+    font-size: 10.5px; color: var(--text-dim); cursor: pointer; padding-bottom: 6px;
+  }
+  .filter-check.disabled { opacity: .45; cursor: default; }
+  .filter-check input { accent-color: var(--amber); }
+  .filter-clear {
+    font-family: var(--mono); font-size: 10.5px; background: transparent;
+    border: 1px solid var(--red); color: var(--red); border-radius: 5px;
+    padding: 6px 10px; cursor: pointer; margin-bottom: 4px;
+  }
+  .filter-clear:hover { background: rgba(217,105,95,.1); }
+  .filter-count {
+    font-family: var(--mono); font-size: 10.5px; color: var(--text-faint);
+    margin-left: auto; padding-bottom: 6px; white-space: nowrap;
+  }
+
+  .card-lane-tag {
+    font-family: var(--mono); font-size: 9px; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--teal); background: var(--teal-dim); border-radius: 3px; padding: 2px 6px;
+    display: inline-block; margin-bottom: 5px;
+  }
+  .posting-card.dismissed { opacity: .4; }
+  .dismiss-btn {
+    font-family: var(--mono); font-size: 10.5px; padding: 5px 9px; border-radius: 4px;
+    cursor: pointer; background: transparent; color: var(--text-faint); border: 1px solid var(--line);
+  }
+  .dismiss-btn:hover { border-color: var(--red); color: var(--red); }
   .nav-footnote {
     font-family: var(--mono); font-size: 9.5px; color: var(--text-faint); padding: 10px 16px 4px; line-height: 1.6;
   }
@@ -446,23 +495,164 @@
   let liveData = {};       // laneId -> { jobs, error }
   let starredPostings = {};   // { jobId: {id, title, company, url, meta, laneId, laneTitle} }
   let newPostings = [];       // [{id, title, company, url, meta, laneId, laneTitle, created}]
+  let dismissedIds = {};      // { jobId: true } — hidden from all views until un-dismissed
   let activeLane = LANES[0].id;
   let leads = [];
+
+  // ===== Filters & sort (applied to live postings across all views) =====
+  const DISMISSED_KEY = 'dismissed-postings-v1';
+  const FILTERS_KEY = 'filters-v1';
+  const ALL_LANES_ID = '__all__';
+
+  let filters = {
+    maxAgeDays: 0,        // 0 = any age
+    minSalary: 0,         // 0 = any pay
+    includeNoSalary: true, // many Adzuna posts have no salary — keep them by default
+    keyword: '',
+    sortBy: 'newest',     // newest | payHigh | lane
+    showDismissed: false,
+  };
+
+  function loadFilterState() {
+    try { dismissedIds = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '{}'); } catch (e) { dismissedIds = {}; }
+    try {
+      const saved = JSON.parse(localStorage.getItem(FILTERS_KEY) || 'null');
+      if (saved) filters = { ...filters, ...saved };
+    } catch (e) {}
+  }
+  function persistDismissed() {
+    try { localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissedIds)); } catch (e) {}
+  }
+  function persistFilters() {
+    try { localStorage.setItem(FILTERS_KEY, JSON.stringify(filters)); } catch (e) {}
+  }
+
+  function toggleDismiss(jobId) {
+    if (dismissedIds[jobId]) delete dismissedIds[jobId];
+    else dismissedIds[jobId] = true;
+    persistDismissed();
+    renderNav();
+    renderMain();
+  }
+
+  // Normalizes a raw Adzuna job into the shape the card renderer expects,
+  // tagged with its lane so the All-Lanes view can show where it came from.
+  function normalizeJob(j, laneId) {
+    const lane = LANES.find(l => l.id === laneId);
+    return {
+      id: j.id,
+      rawSalaryMin: j.salaryMin, rawSalaryMax: j.salaryMax,
+      title: j.title,
+      company: `${j.company || 'Unknown company'} — ${j.location || ''}`,
+      meta: `${j.salaryMin ? '$' + Math.round(j.salaryMin).toLocaleString() : '?'}${j.salaryMax ? '–$' + Math.round(j.salaryMax).toLocaleString() : ''} · via Adzuna`,
+      url: j.url,
+      desc: j.description ? j.description + '…' : '',
+      created: j.created,
+      laneId,
+      laneTitle: lane ? lane.title.split(' / ')[0].split(' (')[0] : laneId,
+    };
+  }
+
+  function jobsForLane(laneId) {
+    if (laneId === ALL_LANES_ID) {
+      const all = [];
+      LANES.forEach(l => {
+        const d = liveData[l.id];
+        if (d && d.jobs) d.jobs.forEach(j => all.push(normalizeJob(j, l.id)));
+      });
+      return all;
+    }
+    const d = liveData[laneId];
+    if (!d || !d.jobs) return [];
+    return d.jobs.map(j => normalizeJob(j, laneId));
+  }
+
+  function passesFilters(job) {
+    if (!filters.showDismissed && dismissedIds[job.id]) return false;
+
+    if (filters.maxAgeDays > 0 && job.created) {
+      const days = (new Date() - new Date(job.created)) / 86400000;
+      if (days > filters.maxAgeDays) return false;
+    }
+
+    if (filters.minSalary > 0) {
+      const hasSalary = job.rawSalaryMax || job.rawSalaryMin;
+      if (!hasSalary) {
+        if (!filters.includeNoSalary) return false;
+      } else {
+        // Compare against the top of the range — a $70k–$110k posting should
+        // survive a "$100k+" filter rather than being cut by its floor.
+        const top = job.rawSalaryMax || job.rawSalaryMin;
+        if (top < filters.minSalary) return false;
+      }
+    }
+
+    if (filters.keyword.trim()) {
+      const kw = filters.keyword.trim().toLowerCase();
+      const haystack = `${job.title} ${job.company} ${job.desc}`.toLowerCase();
+      if (!haystack.includes(kw)) return false;
+    }
+    return true;
+  }
+
+  function sortJobs(jobs) {
+    const sorted = [...jobs];
+    if (filters.sortBy === 'payHigh') {
+      sorted.sort((a, b) => (b.rawSalaryMax || b.rawSalaryMin || 0) - (a.rawSalaryMax || a.rawSalaryMin || 0));
+    } else if (filters.sortBy === 'lane') {
+      sorted.sort((a, b) => a.laneTitle.localeCompare(b.laneTitle) || (new Date(b.created || 0) - new Date(a.created || 0)));
+    } else {
+      sorted.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
+    }
+    return sorted;
+  }
+
+  function filteredJobsForLane(laneId) {
+    return sortJobs(jobsForLane(laneId).filter(passesFilters));
+  }
+
+  function activeFilterCount() {
+    let n = 0;
+    if (filters.maxAgeDays > 0) n++;
+    if (filters.minSalary > 0) n++;
+    if (filters.keyword.trim()) n++;
+    if (!filters.includeNoSalary) n++;
+    if (filters.showDismissed) n++;
+    return n;
+  }
+
+  function dismissedCount() { return Object.keys(dismissedIds).length; }
 
   // ===== Nav rail =====
   function renderNav() {
     const el = document.getElementById('navRail');
-    el.innerHTML = LANES.map(l => `
-      <div class="nav-item ${l.id === activeLane ? 'active' : ''}" data-nav="${l.id}">
+    const allCount = filteredJobsForLane(ALL_LANES_ID).length;
+    const anyFetched = Object.keys(liveData).length > 0;
+
+    const allItem = `
+      <div class="nav-item all-lanes ${activeLane === ALL_LANES_ID ? 'active' : ''}" data-nav="${ALL_LANES_ID}">
+        <span class="nav-num">★</span>
+        <span class="nav-label">All Lanes</span>
+        <span class="nav-badges">
+          ${anyFetched ? `<span class="nav-count">${allCount}</span>` : ''}
+        </span>
+      </div>
+      <div class="nav-divider"></div>`;
+
+    el.innerHTML = allItem + LANES.map(l => {
+      const count = anyFetched ? filteredJobsForLane(l.id).length : null;
+      return `
+      <div class="nav-item ${l.id === activeLane ? 'active' : ''} ${count === 0 ? 'dim' : ''}" data-nav="${l.id}">
         <span class="nav-num">${String(l.num).padStart(2,'0')}</span>
         <span class="nav-label">${escapeHtml(l.title)}</span>
         <span class="nav-badges">
-          ${liveData[l.id] && liveData[l.id].jobs ? `<span class="nav-count">${liveData[l.id].jobs.length}</span>` : ''}
+          ${count !== null ? `<span class="nav-count ${count === 0 ? 'zero' : ''}">${count}</span>` : ''}
           <span class="nav-check-dot" id="navdot-${l.id}"></span>
         </span>
-      </div>`).join('') + `
+      </div>`;
+    }).join('') + `
       <div class="nav-divider"></div>
-      <div class="nav-footnote">↑↓ to move · Enter to open<br>Leads persist automatically</div>`;
+      <div class="nav-footnote">↑↓ to move · Enter to open<br>Counts reflect active filters</div>`;
     el.querySelectorAll('[data-nav]').forEach(item => {
       item.addEventListener('click', () => selectLane(item.getAttribute('data-nav')));
     });
@@ -476,38 +666,84 @@
   }
 
   // ===== Main pane =====
-  function renderMain() {
-    const lane = LANES.find(l => l.id === activeLane);
-    const live = liveData[lane.id];
-    const el = document.getElementById('mainPane');
+  function filterBarHtml(shownCount, totalCount) {
+    const nActive = activeFilterCount();
+    const nDismissed = dismissedCount();
+    return `
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Age</label>
+          <select id="fAge">
+            <option value="0" ${filters.maxAgeDays === 0 ? 'selected' : ''}>Any</option>
+            <option value="3" ${filters.maxAgeDays === 3 ? 'selected' : ''}>≤ 3 days</option>
+            <option value="7" ${filters.maxAgeDays === 7 ? 'selected' : ''}>≤ 1 week</option>
+            <option value="14" ${filters.maxAgeDays === 14 ? 'selected' : ''}>≤ 2 weeks</option>
+            <option value="30" ${filters.maxAgeDays === 30 ? 'selected' : ''}>≤ 1 month</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Min pay</label>
+          <select id="fSalary">
+            <option value="0" ${filters.minSalary === 0 ? 'selected' : ''}>Any</option>
+            <option value="70000" ${filters.minSalary === 70000 ? 'selected' : ''}>$70K+</option>
+            <option value="80000" ${filters.minSalary === 80000 ? 'selected' : ''}>$80K+</option>
+            <option value="100000" ${filters.minSalary === 100000 ? 'selected' : ''}>$100K+</option>
+            <option value="130000" ${filters.minSalary === 130000 ? 'selected' : ''}>$130K+</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Search</label>
+          <input type="text" id="fKeyword" placeholder="title, company, text…" value="${escapeAttr(filters.keyword)}" />
+        </div>
+        <div class="filter-group">
+          <label>Sort</label>
+          <select id="fSort">
+            <option value="newest" ${filters.sortBy === 'newest' ? 'selected' : ''}>Newest</option>
+            <option value="payHigh" ${filters.sortBy === 'payHigh' ? 'selected' : ''}>Highest pay</option>
+            <option value="lane" ${filters.sortBy === 'lane' ? 'selected' : ''}>By lane</option>
+          </select>
+        </div>
+        <label class="filter-check ${filters.minSalary === 0 ? 'disabled' : ''}" title="${filters.minSalary === 0 ? 'Only applies when a min pay filter is set' : 'Many postings list no salary at all'}">
+          <input type="checkbox" id="fNoSalary" ${filters.includeNoSalary ? 'checked' : ''} ${filters.minSalary === 0 ? 'disabled' : ''} />
+          Include no-salary posts
+        </label>
+        ${nDismissed ? `<label class="filter-check"><input type="checkbox" id="fShowDismissed" ${filters.showDismissed ? 'checked' : ''} /> Show dismissed (${nDismissed})</label>` : ''}
+        ${nActive ? `<button class="filter-clear" id="fClear">Clear filters (${nActive})</button>` : ''}
+        <span class="filter-count">${shownCount} of ${totalCount}</span>
+      </div>`;
+  }
 
-    // Context note: only shown when there's no live-postings fallback needed —
-    // i.e. lanes where research never turned up a confirmed opening, so this
-    // is evergreen analysis (not a stale posting standing in as if current).
-    const contextNote = (!lane.postings.length && lane.snapshot)
-      ? `<div class="context-note">${escapeHtml(lane.snapshot)}</div>` : '';
+  function renderMain() {
+    const el = document.getElementById('mainPane');
+    const isAll = activeLane === ALL_LANES_ID;
+    const lane = isAll ? null : LANES.find(l => l.id === activeLane);
+    const anyFetched = Object.keys(liveData).length > 0;
+
+    const totalJobs = jobsForLane(activeLane).length;
+    const shown = filteredJobsForLane(activeLane);
 
     let liveHtml;
-    if (!live) {
+    if (!anyFetched) {
       liveHtml = `<div class="pane-empty">Not fetched yet — click "Refresh Live" above.</div>`;
-    } else if (live.error) {
-      liveHtml = `<div class="live-error">Live fetch failed: ${escapeHtml(live.error)}</div>`;
-    } else if (!live.jobs || !live.jobs.length) {
-      liveHtml = `<div class="pane-empty">No live results from Adzuna for this lane right now.</div>`;
+    } else if (!isAll && liveData[lane.id] && liveData[lane.id].error) {
+      liveHtml = `<div class="live-error">Live fetch failed: ${escapeHtml(liveData[lane.id].error)}</div>`;
+    } else if (!totalJobs) {
+      liveHtml = `<div class="pane-empty">No live results from Adzuna${isAll ? '' : ' for this lane'} right now.</div>`;
+    } else if (!shown.length) {
+      liveHtml = `<div class="pane-empty">All ${totalJobs} posting${totalJobs > 1 ? 's' : ''} filtered out — loosen the filters above.</div>`;
     } else {
-      liveHtml = live.jobs.map(j => postingCardHtml({
-        id: j.id,
-        title: j.title, company: `${j.company || 'Unknown company'} — ${j.location || ''}`,
-        meta: `${j.salaryMin ? '$' + Math.round(j.salaryMin).toLocaleString() : '?'}${j.salaryMax ? '–$' + Math.round(j.salaryMax).toLocaleString() : ''} · via Adzuna`,
-        url: j.url, desc: j.description ? j.description + '…' : '',
-        created: j.created,
-        laneTitle: lane.title.split(' / ')[0].split(' (')[0],
-      }, lane.id, true)).join('');
+      liveHtml = shown.map(j => postingCardHtml(j, j.laneId, true, isAll)).join('');
     }
 
-    const feedsHtml = lane.feeds.map(f => `<a class="feed-link" target="_blank" href="${escapeAttr(f.url)}">${escapeHtml(f.label)} ↗</a>`).join('');
-
-    el.innerHTML = `
+    const header = isAll ? `
+      <div class="lane-header">
+        <div class="lane-header-top">
+          <div>
+            <h1 class="lane-title">All Lanes</h1>
+            <div class="lane-sub">Every live posting across all 12 lanes, pooled and filterable</div>
+          </div>
+        </div>
+      </div>` : `
       <div class="lane-header">
         <div class="lane-header-top">
           <div>
@@ -516,43 +752,87 @@
           </div>
           <button class="checked-btn" id="checkedBtn" data-check="${lane.id}">Mark checked today</button>
         </div>
-        ${contextNote}
-      </div>
+        ${(!lane.postings.length && lane.snapshot) ? `<div class="context-note">${escapeHtml(lane.snapshot)}</div>` : ''}
+      </div>`;
+
+    const belowPanes = isAll ? '' : `
+      <div class="below-panes">
+        <div class="feeds-row">${lane.feeds.map(f => `<a class="feed-link" target="_blank" href="${escapeAttr(f.url)}">${escapeHtml(f.label)} ↗</a>`).join('')}</div>
+        <div class="companies-row" id="companiesRow"></div>
+        <div class="filter-note">${escapeHtml(lane.filterNote)}</div>
+      </div>`;
+
+    el.innerHTML = `
+      ${header}
+      ${filterBarHtml(shown.length, totalJobs)}
       <div class="pane-row">
         <div class="pane">
           <div class="pane-head"><span class="pane-head-label live">Live — Adzuna</span></div>
           <div class="pane-body" id="livePaneBody">${liveHtml}</div>
         </div>
       </div>
-      <div class="below-panes">
-        <div class="feeds-row">${feedsHtml}</div>
-        <div class="companies-row" id="companiesRow"></div>
-        <div class="filter-note">${escapeHtml(lane.filterNote)}</div>
-      </div>
+      ${belowPanes}
     `;
 
-    document.getElementById('checkedBtn').addEventListener('click', async () => {
-      const checks = await loadLaneChecks();
-      checks[lane.id] = new Date().toDateString();
-      await saveLaneChecks(checks);
+    wireFilterBar();
+
+    if (!isAll) {
+      document.getElementById('checkedBtn').addEventListener('click', async () => {
+        const checks = await loadLaneChecks();
+        checks[lane.id] = new Date().toDateString();
+        await saveLaneChecks(checks);
+        renderCheckedBtn(lane.id);
+        updateNavChecks();
+      });
       renderCheckedBtn(lane.id);
-      updateNavChecks();
-    });
-    renderCheckedBtn(lane.id);
+      renderCompaniesChecklist(lane);
+    }
 
     el.querySelectorAll('[data-track]').forEach(btn => {
       btn.addEventListener('click', () => {
         const p = JSON.parse(btn.getAttribute('data-track'));
-        prefillLead(p.title, p.company, p.url, lane.id);
+        prefillLead(p.title, p.company, p.url, p.laneId || activeLane);
       });
     });
     el.querySelectorAll('[data-star-inline]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const job = JSON.parse(btn.getAttribute('data-star-inline'));
-        toggleStar(job);
-      });
+      btn.addEventListener('click', () => toggleStar(JSON.parse(btn.getAttribute('data-star-inline'))));
     });
-    renderCompaniesChecklist(lane);
+    el.querySelectorAll('[data-dismiss]').forEach(btn => {
+      btn.addEventListener('click', () => toggleDismiss(btn.getAttribute('data-dismiss')));
+    });
+  }
+
+  function wireFilterBar() {
+    const onChange = () => { persistFilters(); renderNav(); renderMain(); };
+    const age = document.getElementById('fAge');
+    if (age) age.addEventListener('change', e => { filters.maxAgeDays = parseInt(e.target.value); onChange(); });
+    const sal = document.getElementById('fSalary');
+    if (sal) sal.addEventListener('change', e => { filters.minSalary = parseInt(e.target.value); onChange(); });
+    const sort = document.getElementById('fSort');
+    if (sort) sort.addEventListener('change', e => { filters.sortBy = e.target.value; onChange(); });
+    const noSal = document.getElementById('fNoSalary');
+    if (noSal) noSal.addEventListener('change', e => { filters.includeNoSalary = e.target.checked; onChange(); });
+    const showDis = document.getElementById('fShowDismissed');
+    if (showDis) showDis.addEventListener('change', e => { filters.showDismissed = e.target.checked; onChange(); });
+    const clear = document.getElementById('fClear');
+    if (clear) clear.addEventListener('click', () => {
+      filters = { maxAgeDays: 0, minSalary: 0, includeNoSalary: true, keyword: '', sortBy: filters.sortBy, showDismissed: false };
+      onChange();
+    });
+    const kw = document.getElementById('fKeyword');
+    if (kw) {
+      let debounce;
+      kw.addEventListener('input', e => {
+        clearTimeout(debounce);
+        const val = e.target.value;
+        debounce = setTimeout(() => {
+          filters.keyword = val;
+          persistFilters(); renderNav(); renderMain();
+          const box = document.getElementById('fKeyword');
+          if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+        }, 350);
+      });
+    }
   }
 
   // ===== Companies to watch (per lane) =====
@@ -594,18 +874,20 @@
     return `Posted ${Math.round(days / 30)} mo ago`;
   }
 
-  function postingCardHtml(p, laneId, isLive) {
-    const trackPayload = escapeAttr(JSON.stringify({ title: p.title, company: p.company, url: p.url }));
+  function postingCardHtml(p, laneId, isLive, showLaneTag) {
+    const trackPayload = escapeAttr(JSON.stringify({ title: p.title, company: p.company, url: p.url, laneId }));
     const isStarred = p.id && starredPostings[p.id];
+    const isDismissed = p.id && dismissedIds[p.id];
     const freshness = isLive && p.created ? postedAgoLabel(p.created) : '';
     const starPayload = p.id ? escapeAttr(JSON.stringify({
       id: p.id, title: p.title, company: p.company, url: p.url, meta: p.meta,
       laneId, laneTitle: p.laneTitle || laneId,
     })) : '';
     return `
-      <div class="posting-card">
+      <div class="posting-card ${isDismissed ? 'dismissed' : ''}">
         <div class="posting-top">
           <div>
+            ${showLaneTag && p.laneTitle ? `<span class="card-lane-tag">${escapeHtml(p.laneTitle)}</span>` : ''}
             <div class="posting-title">${escapeHtml(p.title)}</div>
             <div class="posting-company">${escapeHtml(p.company)}</div>
             ${p.meta ? `<div class="posting-meta">${escapeHtml(p.meta)}${freshness ? ' · ' + escapeHtml(freshness) : ''}</div>` : ''}
@@ -616,6 +898,7 @@
         <div class="posting-actions">
           ${p.url ? `<a class="posting-apply" target="_blank" href="${escapeAttr(p.url)}">View & Apply ↗</a>` : ''}
           <button class="track-btn" data-track="${trackPayload}">+ Track</button>
+          ${p.id ? `<button class="dismiss-btn" data-dismiss="${escapeAttr(p.id)}">${isDismissed ? '↩ Restore' : '✕ Dismiss'}</button>` : ''}
         </div>
       </div>`;
   }
@@ -650,6 +933,7 @@
     }
   }
   document.getElementById('fetchLiveBtn').addEventListener('click', fetchLivePostings);
+  loadFilterState();
   loadWeekState();
   renderWeekStrip();
   fetchLivePostings();
@@ -849,9 +1133,10 @@
     if (document.getElementById('scoutBackdrop').classList.contains('open')) return;
     const tag = (document.activeElement.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
-    const idx = LANES.findIndex(l => l.id === activeLane);
-    if (e.key === 'ArrowDown') { e.preventDefault(); selectLane(LANES[Math.min(idx + 1, LANES.length - 1)].id); }
-    if (e.key === 'ArrowUp') { e.preventDefault(); selectLane(LANES[Math.max(idx - 1, 0)].id); }
+    const navIds = [ALL_LANES_ID, ...LANES.map(l => l.id)];
+    const idx = navIds.indexOf(activeLane);
+    if (e.key === 'ArrowDown') { e.preventDefault(); selectLane(navIds[Math.min(idx + 1, navIds.length - 1)]); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); selectLane(navIds[Math.max(idx - 1, 0)]); }
   });
 
   function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str || ''; return d.innerHTML; }
@@ -906,7 +1191,7 @@
       (jobs || []).forEach(j => {
         if (!j.id) return;
         allIdsThisFetch.push(j.id);
-        if (!seenSet.has(j.id)) {
+        if (!seenSet.has(j.id) && !dismissedIds[j.id]) {
           freshlyNew.push({
             id: j.id, title: j.title,
             company: `${j.company || 'Unknown company'} — ${j.location || ''}`,
