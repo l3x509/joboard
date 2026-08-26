@@ -253,7 +253,31 @@
   .card-lane-tag {
     font-family: var(--mono); font-size: 9px; letter-spacing: .05em; text-transform: uppercase;
     color: var(--teal); background: var(--teal-dim); border-radius: 3px; padding: 2px 6px;
-    display: inline-block; margin-bottom: 5px;
+    display: inline-block; margin-bottom: 7px; opacity: .8;
+  }
+  .fit-line {
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    margin: 5px 0 6px;
+  }
+  .fit-badge {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .04em;
+    border-radius: 3px; padding: 2px 7px; white-space: nowrap; font-weight: 600;
+  }
+  .fit-badge.strong { color: var(--green); border: 1px solid var(--green); background: rgba(110,201,127,.08); }
+  .fit-badge.moderate { color: var(--amber); border: 1px solid var(--amber-dim); background: rgba(232,163,61,.07); }
+  .fit-badge.weak { color: var(--text-faint); border: 1px solid var(--line); }
+  .fit-why {
+    font-family: var(--mono); font-size: 10px; color: var(--text-dim); line-height: 1.45;
+  }
+  .senior-badge {
+    font-family: var(--mono); font-size: 8.5px; letter-spacing: .06em;
+    color: var(--red); border: 1px solid var(--red); border-radius: 3px;
+    padding: 1px 5px; margin-left: 7px; vertical-align: middle; font-weight: 500;
+  }
+  .dupe-badge {
+    font-family: var(--mono); font-size: 8.5px; color: var(--text-faint);
+    border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px;
+    margin-left: 5px; vertical-align: middle;
   }
   .posting-card.dismissed { opacity: .4; }
   .dismiss-btn {
@@ -511,6 +535,9 @@
     keyword: '',
     sortBy: 'newest',     // newest | payHigh | lane
     showDismissed: false,
+    minFit: 0,            // 0 = any; 32 = possible+; 60 = strong only
+    hideSenior: false,    // hide Lead/Manager/Director/Principal-level roles
+    groupDuplicates: true, // collapse staffing-agency reposts of the same role
   };
 
   function loadFilterState() {
@@ -544,7 +571,7 @@
       rawSalaryMin: j.salaryMin, rawSalaryMax: j.salaryMax,
       title: j.title,
       company: `${j.company || 'Unknown company'} — ${j.location || ''}`,
-      meta: `${j.salaryMin ? '$' + Math.round(j.salaryMin).toLocaleString() : '?'}${j.salaryMax ? '–$' + Math.round(j.salaryMax).toLocaleString() : ''} · via Adzuna`,
+      meta: `${formatSalary(j.salaryMin, j.salaryMax)} · via Adzuna`,
       url: j.url,
       desc: j.description ? j.description + '…' : '',
       created: j.created,
@@ -587,6 +614,10 @@
       }
     }
 
+    if (filters.hideSenior && isSeniorRole(job.title)) return false;
+
+    if (filters.minFit > 0 && scoreFit(job).score < filters.minFit) return false;
+
     if (filters.keyword.trim()) {
       const kw = filters.keyword.trim().toLowerCase();
       const haystack = `${job.title} ${job.company} ${job.desc}`.toLowerCase();
@@ -597,7 +628,9 @@
 
   function sortJobs(jobs) {
     const sorted = [...jobs];
-    if (filters.sortBy === 'payHigh') {
+    if (filters.sortBy === 'bestFit') {
+      sorted.sort((a, b) => scoreFit(b).score - scoreFit(a).score || (new Date(b.created || 0) - new Date(a.created || 0)));
+    } else if (filters.sortBy === 'payHigh') {
       sorted.sort((a, b) => (b.rawSalaryMax || b.rawSalaryMin || 0) - (a.rawSalaryMax || a.rawSalaryMin || 0));
     } else if (filters.sortBy === 'lane') {
       sorted.sort((a, b) => a.laneTitle.localeCompare(b.laneTitle) || (new Date(b.created || 0) - new Date(a.created || 0)));
@@ -608,7 +641,7 @@
   }
 
   function filteredJobsForLane(laneId) {
-    return sortJobs(jobsForLane(laneId).filter(passesFilters));
+    return sortJobs(collapseDuplicates(jobsForLane(laneId).filter(passesFilters)));
   }
 
   function activeFilterCount() {
@@ -618,6 +651,9 @@
     if (filters.keyword.trim()) n++;
     if (!filters.includeNoSalary) n++;
     if (filters.showDismissed) n++;
+    if (filters.hideSenior) n++;
+    if (filters.minFit > 0) n++;
+    if (!filters.groupDuplicates) n++;
     return n;
   }
 
@@ -696,8 +732,17 @@
           <input type="text" id="fKeyword" placeholder="title, company, text…" value="${escapeAttr(filters.keyword)}" />
         </div>
         <div class="filter-group">
+          <label>Fit</label>
+          <select id="fFit">
+            <option value="0" ${filters.minFit === 0 ? 'selected' : ''}>Any</option>
+            <option value="22" ${filters.minFit === 22 ? 'selected' : ''}>Possible+</option>
+            <option value="55" ${filters.minFit === 55 ? 'selected' : ''}>Strong only</option>
+          </select>
+        </div>
+        <div class="filter-group">
           <label>Sort</label>
           <select id="fSort">
+            <option value="bestFit" ${filters.sortBy === 'bestFit' ? 'selected' : ''}>Best fit</option>
             <option value="newest" ${filters.sortBy === 'newest' ? 'selected' : ''}>Newest</option>
             <option value="payHigh" ${filters.sortBy === 'payHigh' ? 'selected' : ''}>Highest pay</option>
             <option value="lane" ${filters.sortBy === 'lane' ? 'selected' : ''}>By lane</option>
@@ -706,6 +751,14 @@
         <label class="filter-check ${filters.minSalary === 0 ? 'disabled' : ''}" title="${filters.minSalary === 0 ? 'Only applies when a min pay filter is set' : 'Many postings list no salary at all'}">
           <input type="checkbox" id="fNoSalary" ${filters.includeNoSalary ? 'checked' : ''} ${filters.minSalary === 0 ? 'disabled' : ''} />
           Include no-salary posts
+        </label>
+        <label class="filter-check" title="Hides Lead / Manager / Director / Principal / Architect-level titles">
+          <input type="checkbox" id="fHideSenior" ${filters.hideSenior ? 'checked' : ''} />
+          Hide senior-level
+        </label>
+        <label class="filter-check" title="Staffing agencies often post the same role multiple times">
+          <input type="checkbox" id="fGroupDupes" ${filters.groupDuplicates ? 'checked' : ''} />
+          Group duplicates
         </label>
         ${nDismissed ? `<label class="filter-check"><input type="checkbox" id="fShowDismissed" ${filters.showDismissed ? 'checked' : ''} /> Show dismissed (${nDismissed})</label>` : ''}
         ${nActive ? `<button class="filter-clear" id="fClear">Clear filters (${nActive})</button>` : ''}
@@ -808,15 +861,22 @@
     if (age) age.addEventListener('change', e => { filters.maxAgeDays = parseInt(e.target.value); onChange(); });
     const sal = document.getElementById('fSalary');
     if (sal) sal.addEventListener('change', e => { filters.minSalary = parseInt(e.target.value); onChange(); });
+    const fit = document.getElementById('fFit');
+    if (fit) fit.addEventListener('change', e => { filters.minFit = parseInt(e.target.value); onChange(); });
     const sort = document.getElementById('fSort');
     if (sort) sort.addEventListener('change', e => { filters.sortBy = e.target.value; onChange(); });
     const noSal = document.getElementById('fNoSalary');
     if (noSal) noSal.addEventListener('change', e => { filters.includeNoSalary = e.target.checked; onChange(); });
     const showDis = document.getElementById('fShowDismissed');
     if (showDis) showDis.addEventListener('change', e => { filters.showDismissed = e.target.checked; onChange(); });
+    const hideSr = document.getElementById('fHideSenior');
+    if (hideSr) hideSr.addEventListener('change', e => { filters.hideSenior = e.target.checked; onChange(); });
+    const grpDup = document.getElementById('fGroupDupes');
+    if (grpDup) grpDup.addEventListener('change', e => { filters.groupDuplicates = e.target.checked; onChange(); });
     const clear = document.getElementById('fClear');
     if (clear) clear.addEventListener('click', () => {
-      filters = { maxAgeDays: 0, minSalary: 0, includeNoSalary: true, keyword: '', sortBy: filters.sortBy, showDismissed: false };
+      filters = { maxAgeDays: 0, minSalary: 0, includeNoSalary: true, keyword: '',
+                  sortBy: filters.sortBy, showDismissed: false, minFit: 0, hideSenior: false, groupDuplicates: true };
       onChange();
     });
     const kw = document.getElementById('fKeyword');
@@ -835,7 +895,133 @@
     }
   }
 
-  // ===== Companies to watch (per lane) =====
+  // ===== Fit scoring =====
+  // Runs entirely client-side against the posting's title + description — no
+  // API calls, so it's free and instant even across 100+ postings. Weights
+  // reflect how directly each skill maps to Dulex's documented experience.
+  const FIT_SIGNALS = [
+    { w: 30, label: 'medical device + security', re: /(medical device|biomedical|bmet|clinical engineer|iomt|healthcare technology management)\b[\s\S]{0,80}(security|cyber|vulnerabilit|risk)|(security|cyber)[\s\S]{0,80}(medical device|biomedical|iomt)/i },
+    { w: 25, label: 'medical device field service', re: /\b(medical device|biomedical|bmet|imaging equipment|diagnostic equipment|clinical engineer|ophthalmic|oct)\b/i },
+    { w: 22, label: 'NG911/E911 experience', re: /\b(ng911|e911|next generation 911|psap|emergency communications)\b/i },
+    { w: 20, label: 'Sentinel/CrowdStrike/Qualys', re: /\b(microsoft sentinel|azure sentinel|crowdstrike|qualys|nessus|falcon)\b/i },
+    { w: 18, label: 'SOC / vulnerability work', re: /\b(soc analyst|security operations|vulnerability (management|assessment|scanning)|incident response|threat detection|siem)\b/i },
+    { w: 18, label: 'Azure security & IAM', re: /\b(entra id|azure ad|az-500|conditional access|privileged identity|rbac|key vault|defender for cloud)\b/i },
+    { w: 14, label: 'Azure / cloud', re: /\b(azure|microsoft cloud)\b/i },
+    { w: 14, label: 'field service engineering', re: /\b(field service|field engineer|on-?site (service|support))\b/i },
+    { w: 12, label: 'network engineering', re: /\b(ccna|routing and switching|ospf|bgp|network engineer|solarwinds|network monitoring)\b/i },
+    { w: 12, label: 'FDA / regulated environment', re: /\b(fda|21 cfr|hipaa|regulated environment|change control|audit trail|joint commission|nist)\b/i },
+    { w: 10, label: 'VMware / virtualization', re: /\b(vmware|esxi|vsphere|hyper-?v|virtualization)\b/i },
+    { w: 10, label: 'Windows / AD administration', re: /\b(active directory|windows server|group policy|windows 1[01]|sccm|intune)\b/i },
+    { w: 8,  label: 'ticketing / ITSM', re: /\b(autotask|servicenow|ticketing system|itsm|remedy)\b/i },
+    { w: 8,  label: 'desktop / end-user support', re: /\b(desktop support|end user support|help ?desk|service desk|technical support)\b/i },
+    { w: 7,  label: 'Security+ / CompTIA', re: /\b(security\+|network\+|comptia|cysa)\b/i },
+    { w: 6,  label: 'French/Creole an asset', re: /\b(bilingual|multilingual|french|haitian|creole)\b/i },
+  ];
+
+  // Things that actively work against him — surfaced honestly rather than hidden
+  const FIT_BLOCKERS = [
+    { label: "bachelor's degree required", re: /\b(bachelor'?s?( degree)? (is )?required|requires a bachelor|b\.?s\.? degree required|must have a bachelor)/i },
+    { label: 'advanced degree required', re: /\b(master'?s?( degree)? required|ph\.?d\.? required|mba required)/i },
+    { label: 'security clearance required', re: /\b(ts\/sci|top secret|active (security )?clearance|secret clearance|polygraph)\b/i },
+    { label: '10+ yrs in one specialty', re: /\b(1[0-9]|2[0-9])\+? ?(years?|yrs?)\b/i },
+    // Referenced lazily via a getter so this array can be defined before
+    // SENIOR_PATTERNS without hitting a temporal-dead-zone error.
+    { label: 'senior/lead scope', get re() { return SENIOR_PATTERNS; } },
+  ];
+
+  function scoreFit(job) {
+    const haystack = `${job.title || ''} ${job.desc || ''}`;
+    const hits = [];
+    let raw = 0;
+    FIT_SIGNALS.forEach(sig => {
+      if (sig.re.test(haystack)) { raw += sig.w; hits.push(sig.label); }
+    });
+    const blockers = FIT_BLOCKERS.filter(b => b.re.test(haystack)).map(b => b.label);
+
+    // Blockers cap the ceiling rather than just subtracting, so a posting that
+    // requires a degree he doesn't have can't read as a "Strong" match.
+    let score = Math.min(100, raw);
+    if (blockers.length) score = Math.min(score, blockers.length >= 2 ? 35 : 55);
+
+    let level, cls;
+    if (score >= 55) { level = 'Strong fit'; cls = 'strong'; }
+    else if (score >= 22) { level = 'Possible fit'; cls = 'moderate'; }
+    else { level = 'Weak fit'; cls = 'weak'; }
+
+    let why = hits.length
+      ? 'Matches: ' + hits.slice(0, 3).join(', ')
+      : 'No direct overlap with your documented skills';
+    if (blockers.length) why += ' · Watch: ' + blockers.slice(0, 2).join(', ');
+
+    return { score, level, cls, why, hits, blockers };
+  }
+
+  // ===== Posting display helpers =====
+
+  // Adzuna often reports salaryMin === salaryMax (a single figure, not a range).
+  // Rendering "$223,108–$223,108" looks broken, so collapse it to one number.
+  function formatSalary(min, max) {
+    if (!min && !max) return 'No salary listed';
+    const lo = min ? Math.round(min) : null;
+    const hi = max ? Math.round(max) : null;
+    if (lo && hi && Math.abs(lo - hi) < 1) return '$' + lo.toLocaleString();
+    if (lo && hi) return '$' + lo.toLocaleString() + '–$' + hi.toLocaleString();
+    return '$' + (lo || hi).toLocaleString();
+  }
+
+  // Flags roles well above the level being targeted, so a $220K "Lead/Manager"
+  // posting is visibly marked rather than sitting alongside realistic matches.
+  const SENIOR_PATTERNS = /\b(lead|manager|director|principal|staff|head of|vp|vice president|chief|architect|sr\.?\s*manager)\b/i;
+  function isSeniorRole(title) {
+    return SENIOR_PATTERNS.test(title || '');
+  }
+
+  // Recruiter/staffing descriptions arrive as unpunctuated run-on text.
+  // Tidy the worst of it, but only treat a keyword as a "label" when it's
+  // followed by a colon — otherwise ordinary prose ("analyst role") gets
+  // mangled into a fake label.
+  function cleanDescription(text) {
+    if (!text) return '';
+    return text
+      .replace(/\s+/g, ' ')
+      .replace(/\b(Role|Location|Loction|Client|Exp|Duration|Interview|Position Summary)\s*:\s*/gi,
+               (m, p1) => ` · ${p1.replace(/^loction$/i, 'Location')}: `)
+      .replace(/^\s*·\s*/, '')
+      .replace(/\s+·\s+·\s+/g, ' · ')
+      .trim();
+  }
+
+  // Staffing agencies frequently post the same role several times with slightly
+  // different titles/salaries. Group them so one entry represents the cluster.
+  function dedupeKey(job) {
+    const company = (job.company || '').toLowerCase().split('—')[0].trim();
+    const title = (job.title || '').toLowerCase()
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\b(local to \w+|remote|hybrid|onsite|w2|c2c|contract|full time|part time)\b/g, '')
+      .replace(/\s+/g, ' ').trim();
+    // First 4 significant words of the title + company is a good-enough signature
+    const sig = title.split(' ').filter(w => w.length > 2).slice(0, 4).join(' ');
+    return `${company}::${sig}`;
+  }
+
+  function collapseDuplicates(jobs) {
+    if (!filters.groupDuplicates) return jobs.map(j => ({ ...j, dupeCount: 1 }));
+    const groups = new Map();
+    jobs.forEach(j => {
+      const k = dedupeKey(j);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(j);
+    });
+    return Array.from(groups.values()).map(group => {
+      if (group.length === 1) return { ...group[0], dupeCount: 1 };
+      // Keep the best-paying variant as the representative
+      const best = group.reduce((a, b) =>
+        (b.rawSalaryMax || b.rawSalaryMin || 0) > (a.rawSalaryMax || a.rawSalaryMin || 0) ? b : a);
+      return { ...best, dupeCount: group.length, dupeIds: group.map(g => g.id) };
+    });
+  }
+
+
   const COMPANIES_CHECKED_KEY = 'companies-checked-v1';
   function loadCompaniesChecked() {
     try { return JSON.parse(localStorage.getItem(COMPANIES_CHECKED_KEY) || '{}'); } catch (e) { return {}; }
@@ -878,6 +1064,7 @@
     const trackPayload = escapeAttr(JSON.stringify({ title: p.title, company: p.company, url: p.url, laneId }));
     const isStarred = p.id && starredPostings[p.id];
     const isDismissed = p.id && dismissedIds[p.id];
+    const fit = scoreFit(p);
     const freshness = isLive && p.created ? postedAgoLabel(p.created) : '';
     const starPayload = p.id ? escapeAttr(JSON.stringify({
       id: p.id, title: p.title, company: p.company, url: p.url, meta: p.meta,
@@ -888,13 +1075,23 @@
         <div class="posting-top">
           <div>
             ${showLaneTag && p.laneTitle ? `<span class="card-lane-tag">${escapeHtml(p.laneTitle)}</span>` : ''}
-            <div class="posting-title">${escapeHtml(p.title)}</div>
+            <div class="posting-title">
+              ${escapeHtml(p.title)}
+              ${isSeniorRole(p.title) ? '<span class="senior-badge" title="Lead/Manager-level — likely above your target band">SENIOR</span>' : ''}
+              ${p.dupeCount > 1 ? `<span class="dupe-badge" title="This employer posted ${p.dupeCount} near-identical listings">×${p.dupeCount}</span>` : ''}
+            </div>
+            <div class="fit-line">
+              <span class="fit-badge ${fit.cls}" title="Confidence ${fit.score}/100 — based on keyword overlap with your documented skills">
+                ${escapeHtml(fit.level)} · ${fit.score}
+              </span>
+              <span class="fit-why">${escapeHtml(fit.why)}</span>
+            </div>
             <div class="posting-company">${escapeHtml(p.company)}</div>
             ${p.meta ? `<div class="posting-meta">${escapeHtml(p.meta)}${freshness ? ' · ' + escapeHtml(freshness) : ''}</div>` : ''}
           </div>
           ${p.id ? `<button class="star-btn ${isStarred ? 'on' : ''}" data-star-inline="${starPayload}" title="${isStarred ? 'Unstar' : 'Star'}">★</button>` : ''}
         </div>
-        ${p.desc ? `<div class="posting-desc">${p.desc}</div>` : ''}
+        ${p.desc ? `<div class="posting-desc">${escapeHtml(cleanDescription(p.desc))}</div>` : ''}
         <div class="posting-actions">
           ${p.url ? `<a class="posting-apply" target="_blank" href="${escapeAttr(p.url)}">View & Apply ↗</a>` : ''}
           <button class="track-btn" data-track="${trackPayload}">+ Track</button>
@@ -1196,7 +1393,7 @@
             id: j.id, title: j.title,
             company: `${j.company || 'Unknown company'} — ${j.location || ''}`,
             url: j.url,
-            meta: `${j.salaryMin ? '$' + Math.round(j.salaryMin).toLocaleString() : '?'}${j.salaryMax ? '–$' + Math.round(j.salaryMax).toLocaleString() : ''} · via Adzuna`,
+            meta: `${formatSalary(j.salaryMin, j.salaryMax)} · via Adzuna`,
             laneId, laneTitle: lane ? lane.title.split(' / ')[0].split(' (')[0] : laneId,
             created: j.created,
           });
