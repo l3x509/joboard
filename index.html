@@ -535,7 +535,8 @@
     keyword: '',
     sortBy: 'newest',     // newest | payHigh | lane
     showDismissed: false,
-    minFit: 0,            // 0 = any; 32 = possible+; 60 = strong only
+    minFit: 0,            // 0 = any; 22 = possible+; 55 = strong only
+    hideIrrelevant: true, // drop CDL drivers, nurses, security guards, etc.
     hideSenior: false,    // hide Lead/Manager/Director/Principal-level roles
     groupDuplicates: true, // collapse staffing-agency reposts of the same role
   };
@@ -595,6 +596,8 @@
   }
 
   function passesFilters(job) {
+    if (filters.hideIrrelevant && isIrrelevantRole(job.title)) return false;
+
     if (!filters.showDismissed && dismissedIds[job.id]) return false;
 
     if (filters.maxAgeDays > 0 && job.created) {
@@ -653,11 +656,18 @@
     if (filters.showDismissed) n++;
     if (filters.hideSenior) n++;
     if (filters.minFit > 0) n++;
+    if (!filters.hideIrrelevant) n++;
     if (!filters.groupDuplicates) n++;
     return n;
   }
 
   function dismissedCount() { return Object.keys(dismissedIds).length; }
+
+  // How many postings in the current view the irrelevance filter is suppressing —
+  // shown in the toggle label so nothing disappears silently.
+  function irrelevantCountForLane(laneId) {
+    return jobsForLane(laneId).filter(j => isIrrelevantRole(j.title)).length;
+  }
 
   // ===== Nav rail =====
   function renderNav() {
@@ -702,7 +712,7 @@
   }
 
   // ===== Main pane =====
-  function filterBarHtml(shownCount, totalCount) {
+  function filterBarHtml(shownCount, totalCount, irrelevantHidden) {
     const nActive = activeFilterCount();
     const nDismissed = dismissedCount();
     return `
@@ -755,6 +765,10 @@
         <label class="filter-check" title="Hides Lead / Manager / Director / Principal / Architect-level titles">
           <input type="checkbox" id="fHideSenior" ${filters.hideSenior ? 'checked' : ''} />
           Hide senior-level
+        </label>
+        <label class="filter-check" title="Adzuna's fuzzy matching pulls in CDL drivers, nurses, security guards and similar unrelated roles">
+          <input type="checkbox" id="fHideIrrelevant" ${filters.hideIrrelevant ? 'checked' : ''} />
+          Hide unrelated jobs${irrelevantHidden ? ` (${irrelevantHidden})` : ''}
         </label>
         <label class="filter-check" title="Staffing agencies often post the same role multiple times">
           <input type="checkbox" id="fGroupDupes" ${filters.groupDuplicates ? 'checked' : ''} />
@@ -817,7 +831,7 @@
 
     el.innerHTML = `
       ${header}
-      ${filterBarHtml(shown.length, totalJobs)}
+      ${filterBarHtml(shown.length, totalJobs, irrelevantCountForLane(activeLane))}
       <div class="pane-row">
         <div class="pane">
           <div class="pane-head"><span class="pane-head-label live">Live — Adzuna</span></div>
@@ -871,12 +885,14 @@
     if (showDis) showDis.addEventListener('change', e => { filters.showDismissed = e.target.checked; onChange(); });
     const hideSr = document.getElementById('fHideSenior');
     if (hideSr) hideSr.addEventListener('change', e => { filters.hideSenior = e.target.checked; onChange(); });
+    const hideIrr = document.getElementById('fHideIrrelevant');
+    if (hideIrr) hideIrr.addEventListener('change', e => { filters.hideIrrelevant = e.target.checked; onChange(); });
     const grpDup = document.getElementById('fGroupDupes');
     if (grpDup) grpDup.addEventListener('change', e => { filters.groupDuplicates = e.target.checked; onChange(); });
     const clear = document.getElementById('fClear');
     if (clear) clear.addEventListener('click', () => {
       filters = { maxAgeDays: 0, minSalary: 0, includeNoSalary: true, keyword: '',
-                  sortBy: filters.sortBy, showDismissed: false, minFit: 0, hideSenior: false, groupDuplicates: true };
+                  sortBy: filters.sortBy, showDismissed: false, minFit: 0, hideIrrelevant: true, hideSenior: false, groupDuplicates: true };
       onChange();
     });
     const kw = document.getElementById('fKeyword');
@@ -928,6 +944,33 @@
     // SENIOR_PATTERNS without hitting a temporal-dead-zone error.
     { label: 'senior/lead scope', get re() { return SENIOR_PATTERNS; } },
   ];
+
+  // Occupations Adzuna's fuzzy matching drags in that have nothing to do with
+  // an IT/field-service search — a CDL driver landing in "field service
+  // engineer medical device", or a security guard landing in "SOC analyst".
+  // Matched against the TITLE only: the description of a legitimate IT job at
+  // a logistics or hospital company would trip a description-based check.
+  const IRRELEVANT_TITLE_PATTERNS = [
+    // Driving / delivery — note \bdriver\b alone is unsafe ("device driver")
+    /\b(cdl|truck driver|delivery driver|class [ab] driver|tractor trailer|driver helper|courier|chauffeur|bus driver|forklift)\b/i,
+    // Hands-on clinical care (comes in via the medical-device lanes)
+    /\b(registered nurse|\brn\b|\blpn\b|\bcna\b|nurse practitioner|medical assistant|phlebotom|caregiver|home health aide|physical therap|occupational therap|respiratory therap|pharmacist|pharmacy tech|dental (hygienist|assistant)|physician|surgeon|radiolog(ist|ic techno)|sonograph|veterinar)\b/i,
+    // Physical security (comes in via the cybersecurity lane)
+    /\b(security (guard|officer|screener)|loss prevention|armed guard|patrol officer|police officer|corrections officer)\b/i,
+    // Retail / food / general labor
+    /\b(cashier|barista|server|waiter|waitress|line cook|dishwasher|retail associate|sales associate|stocker|warehouse (associate|worker|selector)|janitor|custodian|housekeep|landscap|groundskeep)\b/i,
+    // Trades unrelated to his background
+    /\b(hvac (installer|apprentice)|plumber|electrician apprentice|welder|carpenter|roofer|painter|mason|heavy equipment operator)\b/i,
+    // Sales/marketing (he's stated a preference against outbound sales)
+    /\b(outside sales|door.to.door|insurance agent|real estate agent|leasing (agent|consultant)|telemarketer|recruiter)\b/i,
+    // Other clearly-unrelated professional roles
+    /\b(teacher|substitute teacher|paralegal|accountant|bookkeeper|social worker|childcare|preschool)\b/i,
+  ];
+
+  function isIrrelevantRole(title) {
+    const t = title || '';
+    return IRRELEVANT_TITLE_PATTERNS.some(re => re.test(t));
+  }
 
   function scoreFit(job) {
     const haystack = `${job.title || ''} ${job.desc || ''}`;
