@@ -357,6 +357,11 @@
   }
   .company-chip:hover { border-color: var(--amber-dim); }
   .company-chip.checked { color: var(--green); border-color: var(--green); }
+  .target-fit-A { color: var(--green); border-color: var(--green); }
+  .target-fit-B { color: var(--amber); border-color: var(--amber-dim); }
+  .target-fit-C { color: var(--text-dim); border-color: var(--line); }
+  .target-status { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; font-family: var(--mono); font-size: 11px; }
+  .target-card .posting-title .fit-badge { margin-left: 6px; vertical-align: middle; }
   .filter-note {
     font-family: var(--mono); font-size: 11px; color: var(--text-faint); line-height: 1.6;
     border-left: 2px solid var(--line); padding-left: 10px;
@@ -479,6 +484,7 @@
         <option value="Cybersecurity">Cybersecurity</option>
         <option value="UN/ICT">UN/ICT</option>
         <option value="Medical Device Cybersecurity">Medical Device Cybersecurity</option>
+        <option value="Ophthalmic / Clinical Device IT">Ophthalmic / Clinical Device IT</option>
       </select>
       <button class="add-btn" id="addBtn">+ Add lead</button>
     </div>
@@ -515,6 +521,116 @@
 <script>
   const LANES = [{"num": 1, "id": "noc", "title": "NOC / IT Support / Systems", "sub": "Your strongest lane — 8 years NG911 infrastructure, NOC ops", "postings": [{"title": "NOC Technician", "company": "Granite Telecommunications — Quincy, MA", "meta": "~$50K–$69K (Glassdoor est.) · On-site", "url": "https://www.glassdoor.com/job-listing/noc-technician-granite-telecommunications-JV_IC1154667_KO0,14_KE15,41.htm?jl=1009919712219", "desc": "Monitors and troubleshoots client network infrastructure, manages a ticket queue, and works across SD-WAN, firewalls, and enterprise networking. CCNA or Network+ called out directly as qualifying certs. <b style=\"color:var(--red)\">Below your $80K target</b> — worth checking if it's a stepping stone toward their Cloud Ops / Senior roles."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=NOC+engineer&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=NOC%20Engineer&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=NOC+Engineer&location=Boston%2C+MA", "label": "ZipRecruiter"}, {"url": "https://www.simplyhired.com/search?q=noc+engineer&l=massachusetts", "label": "SimplyHired"}, {"url": "https://www.glassdoor.com/Job/jobs.htm?sc.keyword=NOC+engineer&locT=S&locId=1154532", "label": "Glassdoor"}], "filterNote": "Try also: \"network operations\", \"systems administrator\" — widen if results are thin."}, {"num": 2, "id": "field", "title": "Field Service Engineer", "sub": "Medical device / regulated equipment — direct match to Zeiss work", "postings": [{"title": "Field Service Engineer II (Medical Devices)", "company": "Boston Scientific — Boston, MA", "meta": "~$77K–$104K (market est.) · Northeast region travel", "url": "https://jobs.bostonscientific.com/job/Boston-Field-Service-Engineer-II-(Medical-Devices)-Boston,-MA-MA-02101/1405621600/", "desc": "Supports Cardiovascular Division products (IVUS, AngioJet, FARAPULSE, and similar systems) across the Northeast. Requires an Associate's degree/technical diploma plus 1 year experience — <b style=\"color:var(--green)\">or an equivalent combination of training and work experience</b>, which directly fits your background."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=field+service+engineer+medical+device&l=Massachusetts", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=Field%20Service%20Engineer%20Medical%20Device&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Field-Service-Engineer/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://jobs.bostonscientific.com/search/?q=field+service", "label": "Boston Scientific"}, {"url": "https://www.glassdoor.com/Job/massachusetts-field-service-engineer-jobs-SRCH_IL.0,13_IS3399_KO14,36.htm", "label": "Glassdoor"}], "filterNote": "Also check GE HealthCare, Philips, Siemens Healthineers, Canon Medical career pages directly.", "companies": ["GE HealthCare", "Philips", "Siemens Healthineers", "Canon Medical"]}, {"num": 3, "id": "cyber", "title": "Cybersecurity / SOC Analyst", "sub": "Apply Tier 1 / Associate level — matches your BCS 365 experience", "postings": [{"title": "Cybersecurity Analyst / SOC Analyst (multiple levels)", "company": "State Street — Quincy, MA", "meta": "~$80K–$120K (market est.) · Hybrid", "url": "https://www.glassdoor.com/Job/boston-soc-analyst-jobs-SRCH_IL.0,6_IC1154532_KO7,18.htm", "desc": "State Street's Fusion Center runs 24/7 threat detection and response; they post multiple SOC tiers regularly. <b style=\"color:var(--amber)\">Filter for \"Cybersecurity Analyst\" or entry associate-level</b> — the Lead/Senior postings want 4+ years dedicated SOC/IR experience, above your current level."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=SOC+analyst&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=SOC%20Analyst%20Tier%201&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Soc-Analyst-Tier-1/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://www.glassdoor.com/Job/boston-entry-level-cyber-security-jobs-SRCH_IL.0,6_IC1154532_KO7,33.htm", "label": "Glassdoor"}], "filterNote": "Search \"Tier 1\" or \"Associate\" explicitly — avoids senior-level mismatches."}, {"num": 4, "id": "e911", "title": "E911 / NG911 Niche", "sub": "Specialized — thin but high-fit when it hits", "postings": [], "snapshot": "Nothing matching your Technical/IT profile is currently open on NENA/MassNENA — this lane is link-only until something posts. Check back regularly; it moves in bursts.", "feeds": [{"url": "https://www.ziprecruiter.com/Jobs/E911-Engineer", "label": "ZipRecruiter (E911)"}, {"url": "https://www.indeed.com/q-Ng911-jobs.html", "label": "Indeed (NG911)"}, {"url": "https://jobs.nena.org/jobs/state/massachusetts/", "label": "NENA board"}, {"url": "https://www.massnena.org/jobs-1-1", "label": "MassNENA"}, {"url": "https://www.everbridge.com/about/careers/", "label": "Everbridge (Burlington, MA)"}, {"url": "https://www.indeed.com/q-motorola-solutions-l-massachusetts-jobs.html", "label": "Motorola Solutions"}], "filterNote": "Lead with named product experience (Motorola CallWorks, OMON) in any application here.", "companies": ["Everbridge", "Motorola Solutions"]}, {"num": 5, "id": "desktop", "title": "Desktop Support / End User Support", "sub": "Direct match — six roles on your resume touch this exact work", "postings": [{"title": "End User Support Specialist", "company": "Barings — Boston, MA", "meta": "$85,900–$137,500 (posted range) · On-site/Hybrid", "url": "https://www.simplyhired.com/search?q=desktop+support+specialist&l=boston,+ma", "desc": "First and second-line support for end users, resolving technical issues and maintaining high service standards — direct overlap with your Rue La La and Harvard SPH experience. Link goes to the search result; open it and look for the Barings listing specifically since direct-apply links go stale fast on aggregators."}], "snapshot": "Snapshot pulled Aug 19, 2026 — ask Claude to refresh for new postings.", "feeds": [{"url": "https://www.indeed.com/jobs?q=desktop+support&l=Boston%2C+MA", "label": "Indeed"}, {"url": "https://www.linkedin.com/jobs/search/?keywords=Desktop%20Support&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.ziprecruiter.com/Jobs/Desktop-Support/-in-Boston,MA", "label": "ZipRecruiter"}, {"url": "https://www.glassdoor.com/Job/boston-desktop-support-jobs-SRCH_IL.0,6_IC1154532_KO7,22.htm", "label": "Glassdoor"}], "filterNote": "Watch pay carefully in this lane — many desktop support postings run $50K–$70K; filter for \"End User Support,\" \"IT Support Engineer,\" or \"Senior\" to stay near your target."}, {"num": 6, "id": "ngo", "title": "UN / NGO / International", "sub": "Honest flag: most open roles are field-based, local-salary, or need prior INGO experience", "postings": [], "snapshot": "Checked ReliefWeb/UNjobs directly — current ICT/IT Support postings are based in Ethiopia, Kenya, Syria, Philippines, etc., paying local rates well under $80K USD-equivalent, or explicitly require prior NGO/INGO field experience. No US-based, $80K+ match right now. Worth checking periodically — this shifts often — but don't expect this lane to move as fast as the others.", "feeds": [{"url": "https://careers.un.org/jobopening", "label": "UN Careers portal"}, {"url": "https://inspira.un.org/", "label": "UN Inspira"}, {"url": "https://reliefweb.int/jobs", "label": "ReliefWeb Jobs"}, {"url": "https://www.impactpool.org/jobs/c/remote-ngo-jobs", "label": "Impactpool (remote NGO)"}, {"url": "https://unjobs.org/skills/ict", "label": "UNjobs.org (ICT filter)"}], "filterNote": "Filter ReliefWeb/UNjobs by country = United States for any chance at a US-based salary. Field Service (GS) category roles are your best formal fit — see earlier conversation on the nationality restriction for Haiti-based posts specifically."}, {"num": 7, "id": "mdcs", "title": "Medical Device Cybersecurity / HTM", "sub": "Combines your Zeiss field service + BCS 365 security background — narrow niche, structural workforce shortage, low competition", "postings": [{"title": "BMET Cybersecurity Specialist", "company": "Sodexo (Healthcare Technology Management Division) — MA hospital clients", "meta": "Sodexo rotates this exact title across client hospitals nationally (had a Hyannis, MA / Boston-hospital posting) · check their careers page directly, not just aggregators", "url": "https://www.indeed.com/q-medical-device-cybersecurity-l-massachusetts-jobs.html", "desc": "Lead the collection of cybersecurity data in CMMS, conduct device risk assessments, manage vulnerability remediation/patching, and coordinate with hospital IT and device vendors. Your Zeiss change-control/audit-trail work and BCS 365 Sentinel/CrowdStrike/Qualys experience map directly onto this. <b style=\"color:var(--red)\">CySA+ not required</b> — Security+ plus hands-on device experience is enough to be competitive now."}], "snapshot": "Snapshot pulled Aug 20, 2026 — narrow niche; expect a handful of active MA postings at a time, not a high-volume lane. Also watch GE Healthcare, Philips, Siemens Healthineers, and TRIMEDX directly — the other major HTM/device-service contractors that staff this role.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=medical%20device%20cybersecurity&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-BMET-cybersecurity-jobs.html", "label": "Indeed: BMET cybersecurity (national — rotates through MA)"}, {"url": "https://www.himss.org/jobs", "label": "HIMSS Job Mine"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=medical+device+cybersecurity&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Try also: \"healthcare IoT security\", \"clinical engineering cybersecurity\". Widen location to New England if MA results are thin — this lane moves in bursts.", "companies": ["Sodexo (HTM Division)", "GE Healthcare", "Philips", "Siemens Healthineers", "TRIMEDX"]}, {"num": 8, "id": "bmet", "title": "BMET / Clinical Engineering", "sub": "CBET certification path — formalizes your Zeiss device work; 30+ BMET programs closed in 5 years, only ~400 grads/yr vs ~7,300 annual openings", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet. Structural shortage means this is worth checking regularly even without a live hit.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=biomedical%20equipment%20technician&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-biomedical-equipment-technician-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.aami.org/careers/job-board", "label": "AAMI Job Board"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=BMET&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Lead with Zeiss CIRRUS OCT/HFA experience and FDA-regulated change-control work. Consider a BMET associate/certificate program (cuts CBET experience requirement from 4 years to 2)."}, {"num": 9, "id": "healthit", "title": "Healthcare IT / Epic Systems Analyst", "sub": "BLS: 15% growth 2024–2034 — \"much faster than average\"; median $107K, often employer-sponsored Epic cert", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=healthcare%20IT%20analyst&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-healthcare-it-analyst-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.himss.org/jobs", "label": "HIMSS Job Mine"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=Epic+analyst&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Employers frequently sponsor Epic certification after hire — don't screen yourself out for not having it yet."}, {"num": 10, "id": "cloudsec", "title": "Cloud Security Engineer", "sub": "Reactivates your Azure Fundamentals/AZ-500 background — highest ceiling of any lane ($130K–$225K)", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=cloud%20security%20engineer&location=Boston%2C%20Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-cloud-security-engineer-l-boston,-ma-jobs.html", "label": "Indeed"}, {"url": "https://jobs.isc2.org/", "label": "ISC2 Job Board"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=cloud+security+engineer&location=Boston%2C+MA", "label": "ZipRecruiter"}], "filterNote": "Reactivate AZ-500 and finish CySA+ first — the credential pairing is what unlocks this lane's top end."}, {"num": 11, "id": "clinapp", "title": "Clinical Applications / Medical Device Specialist", "sub": "Closest lateral move from OCT field work — device fluency + client-facing training, not repair. $89K–$148K", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet. Weakest fit of the new lanes if outbound sales is involved — screen postings for base-heavy vs. commission-heavy comp before applying.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=clinical%20applications%20specialist&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-clinical-applications-specialist-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=clinical+specialist+medical+device&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Combines Clinical Applications Specialist and Medical Device Sales/Clinical Specialist — same buyer, same skill set, different comp structure per employer."}, {"num": 12, "id": "netqeng", "title": "Network Engineer", "sub": "Fastest to reactivate (CCNA refresh) — moderate ceiling ($90K–$110K), good fallback while pursuing higher-leverage lanes", "postings": [], "snapshot": "Link-only for now — no specific MA posting confirmed yet.", "feeds": [{"url": "https://www.linkedin.com/jobs/search/?keywords=network%20engineer&location=Massachusetts", "label": "LinkedIn"}, {"url": "https://www.indeed.com/q-network-engineer-l-massachusetts-jobs.html", "label": "Indeed"}, {"url": "https://www.ziprecruiter.com/candidate/search?search=network+engineer&location=Massachusetts", "label": "ZipRecruiter"}], "filterNote": "Refresh CCNA — shortest path back into a paying role while longer-lead lanes (Cloud Security, Healthcare IT) develop."}]
 ;
+
+  // ===== Oct 2026 additions: ophthalmic lane + New England target research =====
+  LANES.push({
+    num: 13, id: 'ophth', title: 'Ophthalmic / Eye-Care Device & IT',
+    sub: 'Your sharpest niche — CIRRUS OCT/HFA upgrades, DICOM/PACS and eye-practice networks. Small field, few competitors with this exact experience',
+    postings: [],
+    snapshot: 'Seeded Oct 14, 2026. Most openings here come straight from OEM career pages, so use the feeds and company list below. Watch for: Optos Field Implementation Engineer (networking and integration for installs and upgrades), Topcon Field Service Engineer and Clinical Application Specialist, Heidelberg field service in Franklin. Full list with next steps is under Target Companies.',
+    feeds: [
+      { url: 'https://www.indeed.com/jobs?q=ophthalmic+field+service&l=Massachusetts', label: 'Indeed' },
+      { url: 'https://www.linkedin.com/jobs/search/?keywords=ophthalmic%20field%20service%20engineer&location=New%20England', label: 'LinkedIn' },
+      { url: 'https://careers.optos.com/', label: 'Optos careers' },
+      { url: 'https://www.topconcareers.com/', label: 'Topcon careers' },
+      { url: 'https://www.heidelbergengineering.com/us/', label: 'Heidelberg Engineering' },
+      { url: 'https://asoa.ascrs.org/membership/about-asoa/strategic-business-partners', label: 'ASOA partner list (eye-care IT firms)' }
+    ],
+    filterNote: 'Lead with: Win10→11 upgrades on CIRRUS OCT and HFA across six New England states, DICOM/PACS checks, backup and restore, photo audit trail.',
+    companies: ['Heidelberg Engineering', 'Optos', 'Topcon Healthcare', 'Ophthalmic Instrument Co.', 'CodexIT', 'DAS Health', 'Lombart Instrument']
+  });
+  (function mergeResearch() {
+    const add = (id, names) => { const l = LANES.find(x => x.id === id); if (!l) return; l.companies = [...new Set([...(l.companies || []), ...names])]; };
+    add('field', ['Heidelberg Engineering', 'Optos', 'Topcon Healthcare', 'IQVIA MedTech']);
+    add('mdcs', ['Claroty', 'Asimily', 'Armis', 'Ordr', 'Mass General Brigham']);
+    add('healthit', ['CloudWave', 'ERC Networks', 'DAS Health']);
+    add('bmet', ['Crothall Healthcare', 'DC Medical']);
+    add('clinapp', ['Topcon Healthcare', 'Optos']);
+    const mdcs = LANES.find(x => x.id === 'mdcs');
+    if (mdcs) mdcs.postings = [{
+      title: 'BMET Cybersecurity Specialist', company: 'Sodexo HTM — Boston, MA hospital',
+      meta: 'On-site · confirmed open Oct 2026',
+      url: 'https://www.themuse.com/jobs/sodexo/bmet-cybersecurity-specialist-e4b606',
+      desc: 'Device risk assessments, vulnerability patching, and testing network segmentation with hospital IT. <b style="color:var(--green)">Best match for your security background.</b> Mention segmentation checks on your Zeiss installs.'
+    }];
+  })();
+
+  // Target companies — researched Oct 14, 2026. Fit: A = direct match to Zeiss
+  // device/network work, B = strong overlap, C = backup or volume option.
+  const TARGETS = [
+    { n: 'Ophthalmic Instrument Co. (OIC)', c: 'Ophthalmic service', loc: 'Avon, MA · ~10 min from Randolph', f: 'A', lane: 'ophth', url: 'https://www.oic2020.com/', w: 'Largest ophthalmic equipment and supplies distributor in New England and eastern NY, 40+ years. Services equipment for the same practices you visit.', m: 'Call or walk in. Pitch yourself as the tech for networked diagnostic devices (OCT, visual field).' },
+    { n: 'Heidelberg Engineering US', c: 'Ophthalmic OEM', loc: 'Franklin, MA · US HQ', f: 'A', lane: 'ophth', url: 'https://www.heidelbergengineering.com/us/', w: 'Makes SPECTRALIS OCT and imaging data software, Zeiss\'s direct competitor. National field service team runs from Franklin.', m: 'Find the National Field Service Manager on LinkedIn. Lead with CIRRUS/HFA upgrades and DICOM/PACS.' },
+    { n: 'Optos', c: 'Ophthalmic OEM', loc: 'Marlborough, MA · US HQ', f: 'A', lane: 'ophth', url: 'https://careers.optos.com/', w: 'Retinal imaging maker. Hires Field Service Engineers and a Field Implementation Engineer for networking and integration on installs and upgrades.', m: 'Apply on careers.optos.com; ask about a New England territory.' },
+    { n: 'Topcon Healthcare', c: 'Ophthalmic OEM', loc: 'Oakland, NJ · field roles nationwide', f: 'A', lane: 'ophth', url: 'https://www.topconcareers.com/', w: 'FSE role covers eye-care equipment plus network infrastructure, telehealth platforms, and hardware/software upgrades.', m: 'Set alerts for Field Service Engineer and Clinical Application Specialist, Northeast.' },
+    { n: 'CodexIT', c: 'Eye-care IT', loc: 'Remote · CA and CO offices', f: 'A', lane: 'ophth', url: 'https://asoa.ascrs.org/membership/about-asoa/strategic-business-partners/codexit', w: 'IT firm dedicated to eye care since 2004. Supports diagnostic equipment and review software alongside practice networks.', m: 'Ask about on-site New England coverage or a remote L2 role. Target $75K+.' },
+    { n: 'ERC Networks', c: 'Healthcare IT', loc: 'New England · warm contact', f: 'A', lane: 'healthit', url: '', w: 'Healthcare IT managed services firm run by Eric, introduced through David from Consulting Ophthalmologists.', m: 'Follow up with your DICOM/PACS bullet and your Zeiss end date.' },
+    { n: 'Sodexo HTM', c: 'Device security', loc: 'Boston, MA · hospital site', f: 'A', lane: 'mdcs', url: 'https://www.themuse.com/jobs/sodexo/bmet-cybersecurity-specialist-e4b606', w: 'BMET Cybersecurity Specialist: device risk assessments, patching, network segmentation testing with hospital IT.', m: 'Apply now. Name Security+ (renewing) and segmentation checks on Zeiss installs.' },
+    { n: 'DAS Health', c: 'Eye-care IT', loc: 'NH regional office', f: 'B', lane: 'healthit', url: 'https://dashealth.com/who-we-serve/ophthalmology/', w: 'Healthcare MSP with an ophthalmology line: EHR, managed IT, integration with OCT and other eye-care equipment.', m: 'Contact the NH office about field or integration roles.' },
+    { n: 'IT Support RI', c: 'Eye-care IT', loc: 'North Smithfield, RI', f: 'B', lane: 'ophth', url: 'https://www.itsupportri.com/', w: 'MSP supporting eye-care practices across southern New England for 20+ years. Owner: Paul Riendeau.', m: 'Email the owner directly with a short note on your device experience.' },
+    { n: 'Lombart Instrument', c: 'Ophthalmic service', loc: 'Lakeville, MA branch', f: 'B', lane: 'ophth', url: 'https://www.lombartinstrument.com/', w: 'Ophthalmic equipment distributor and service company, part of Advancing Eyecare.', m: 'Call Lakeville and ask who runs New England service.' },
+    { n: 'New England Ophthalmic Instrument Service', c: 'Ophthalmic service', loc: 'Connecticut', f: 'B', lane: 'ophth', url: '', w: 'Repairs exam instruments; buys and sells used exam lanes.', m: 'Offer overflow help on networked diagnostic devices.' },
+    { n: 'EssilorLuxottica', c: 'Ophthalmic service', loc: 'Avon, MA', f: 'B', lane: 'ophth', url: 'https://careers.essilorluxottica.com/', w: 'Posted a service technician role for ophthalmic and lens-finishing equipment in Avon.', m: 'Search careers for Avon, MA service openings.' },
+    { n: 'CloudWave', c: 'Healthcare IT', loc: 'Marlborough, MA · HQ', f: 'B', lane: 'healthit', url: 'https://gocloudwave.com/', w: 'Healthcare-only MSP for 350 customers: hosting, disaster recovery, security services.', m: 'Target security operations or client support. Your NOC and Sentinel work fits.' },
+    { n: 'Mass General Brigham', c: 'Device security', loc: 'Boston, MA', f: 'B', lane: 'mdcs', url: 'https://jobs.mehi.masstech.org/companies/mass-general-brigham/jobs/55456879-clinical-engineer-biomedical-engineering-systems-division', w: 'Biomedical Engineering Systems Division supports clinical systems incl. firewalls. Prefers a bachelor\'s; lead with experience.', m: 'Watch for Systems Division and clinical engineering roles.' },
+    { n: 'Boston Medical Center', c: 'Device security', loc: 'Boston, MA', f: 'B', lane: 'cyber', url: 'https://careers.bmc.org/jobs/cybersecurity-engineer-boston-massachusetts', w: 'Cybersecurity Engineer role accepts equivalent experience in place of a degree.', m: 'Apply once Security+ or CySA+ is current.' },
+    { n: 'Claroty / Asimily / Armis / Ordr', c: 'Device security', loc: 'Remote and field', f: 'B', lane: 'mdcs', url: '', w: 'Top-ranked hospital device-security platforms (KLAS 2026). Hire deployment and customer engineers who work with clinical engineering.', m: 'Search each careers page for deployment or implementation engineer.' },
+    { n: 'IQVIA MedTech', c: 'Field staffing', loc: 'Nationwide projects', f: 'B', lane: 'field', url: 'https://jobs.iqvia.com/', w: 'Staffs field teams for device makers, including product upgrades. Same model as your Zeiss project.', m: 'Join their talent network; ask about New England device-upgrade projects.' },
+    { n: 'Global Network Systems', c: 'Healthcare IT', loc: 'Exeter, NH', f: 'C', lane: 'healthit', url: '', w: '30+ years of IT for medical practices: clinical systems, private cloud, helpdesk, security.', m: 'Send a short capability note.' },
+    { n: 'SymQuest', c: 'Healthcare IT', loc: 'VT, NH, ME', f: 'C', lane: 'healthit', url: 'https://symquest.com/', w: 'Northern New England MSP serving 60+ healthcare organizations.', m: 'Good for northern territory work.' },
+    { n: 'Open Approach', c: 'Healthcare IT', loc: 'Burlington, VT', f: 'C', lane: 'healthit', url: 'https://openapproach.com/', w: 'MSP supporting EyeCare of Vermont among other healthcare clients.', m: 'Mention eye-care device experience in Vermont.' },
+    { n: 'Crothall Healthcare', c: 'Biomed / HTM', loc: 'Lawrence, MA and others', f: 'C', lane: 'bmet', url: '', w: 'Runs hospital HTM programs. Mostly BMET roles expecting broad repair experience.', m: 'Apply only to imaging or IT-heavy HTM roles.' },
+    { n: 'DC Medical', c: 'Biomed / HTM', loc: 'Wayland, MA', f: 'C', lane: 'bmet', url: '', w: 'Independent New England biomed service firm since 1989; offers on-site contract personnel.', m: 'Ask about contract coverage on networked equipment.' },
+    { n: 'TESA Talent Advisory', c: 'Field staffing', loc: 'New Hampshire', f: 'C', lane: 'field', url: '', w: 'Recruiter that has placed imaging field service engineers in southern NH and north of Boston.', m: 'Send your resume for imaging or device FSE searches.' },
+    { n: 'Experis', c: 'Field staffing', loc: 'Nationwide', f: 'C', lane: 'field', url: 'https://www.experis.com/', w: 'Places device field techs on contract, but recent postings pay $25–29/hr W2.', m: 'Fallback only; push for more.' },
+    { n: 'Field Nation', c: 'Marketplace', loc: 'Online · New England work orders', f: 'C', lane: 'field', url: 'https://fieldnation.com/', w: 'Inbound IT field-work marketplace, 20,000+ work orders a week; 10% fee, one 1099.', m: 'Build a profile for gap-filling between roles.' }
+  ];
+  const TARGETS_ID = '__targets__';
+  const TARGETS_STATUS_KEY = 'targets-status-v1';
+  const TARGET_STATUSES = ['Not started', 'Researching', 'Contacted', 'Applied', 'Interview', 'Not a fit'];
+  let targetCat = 'All';
+  function loadTargetStatus() { try { return JSON.parse(localStorage.getItem(TARGETS_STATUS_KEY) || '{}'); } catch (e) { return {}; } }
+  function saveTargetStatus(d) { try { localStorage.setItem(TARGETS_STATUS_KEY, JSON.stringify(d)); } catch (e) {} }
+
+  function renderTargets(el) {
+    const st = loadTargetStatus();
+    const cats = ['All', ...new Set(TARGETS.map(t => t.c))];
+    const rank = { A: 0, B: 1, C: 2 };
+    const list = TARGETS.filter(t => targetCat === 'All' || t.c === targetCat).sort((a, b) => rank[a.f] - rank[b.f]);
+    const contacted = TARGETS.filter(t => ['Contacted', 'Applied', 'Interview'].includes(st[t.n])).length;
+    el.innerHTML = `
+      <div class="lane-header"><div class="lane-header-top"><div>
+        <h1 class="lane-title">Target Companies</h1>
+        <div class="lane-sub">${TARGETS.length} New England firms matched to your device, clinical IT and security work · ${TARGETS.filter(t => t.f === 'A').length} A-fit · ${contacted} contacted</div>
+      </div></div>
+      <div class="context-note">Check your Resourceful non-solicit before contacting any practice you serviced for Zeiss. "+ Track" sends a company to your Lead Tracker.</div></div>
+      <div class="companies-row" style="margin:12px 0;">${cats.map(c => `<button class="company-chip ${c === targetCat ? 'checked' : ''}" data-tcat="${escapeAttr(c)}">${escapeHtml(c)}</button>`).join('')}</div>
+      <div class="pane"><div class="pane-body">${list.map(t => {
+        const s = st[t.n] || 'Not started';
+        const i = TARGETS.indexOf(t);
+        return `<div class="posting-card target-card ${s === 'Not a fit' ? 'dismissed' : ''}">
+          <div class="posting-top"><div>
+            <span class="card-lane-tag">${escapeHtml(t.c)}</span>
+            <div class="posting-title">${escapeHtml(t.n)} <span class="fit-badge target-fit-${t.f}">FIT ${t.f}</span></div>
+            <div class="posting-company">${escapeHtml(t.loc)} · ${escapeHtml(laneLabel(t.lane))} lane</div>
+          </div></div>
+          <div class="posting-desc">${escapeHtml(t.w)}</div>
+          <div class="posting-desc"><b style="color:var(--amber)">Next:</b> ${escapeHtml(t.m)}</div>
+          <div class="posting-actions">
+            ${t.url ? `<a class="posting-apply" target="_blank" href="${escapeAttr(t.url)}">Open site ↗</a>` : ''}
+            <button class="track-btn" data-ttrack="${i}">+ Track</button>
+            <select class="target-status" data-tstatus="${i}" aria-label="Status for ${escapeAttr(t.n)}">${TARGET_STATUSES.map(x => `<option ${x === s ? 'selected' : ''}>${x}</option>`).join('')}</select>
+          </div>
+        </div>`;
+      }).join('')}</div></div>`;
+    el.querySelectorAll('[data-tcat]').forEach(b => b.addEventListener('click', () => { targetCat = b.getAttribute('data-tcat'); renderTargets(el); }));
+    el.querySelectorAll('[data-tstatus]').forEach(s => s.addEventListener('change', () => {
+      const d = loadTargetStatus(); d[TARGETS[+s.getAttribute('data-tstatus')].n] = s.value; saveTargetStatus(d); renderTargets(el); renderNav();
+    }));
+    el.querySelectorAll('[data-ttrack]').forEach(b => b.addEventListener('click', () => {
+      const t = TARGETS[+b.getAttribute('data-ttrack')];
+      prefillLead(`Outreach — ${t.c}`, t.n, t.url, t.lane);
+    }));
+  }
 
   let liveData = {};       // laneId -> { jobs, error }
   let starredPostings = {};   // { jobId: {id, title, company, url, meta, laneId, laneTitle} }
@@ -683,6 +799,11 @@
           ${anyFetched ? `<span class="nav-count">${allCount}</span>` : ''}
         </span>
       </div>
+      <div class="nav-item all-lanes ${activeLane === TARGETS_ID ? 'active' : ''}" data-nav="${TARGETS_ID}">
+        <span class="nav-num">◎</span>
+        <span class="nav-label">Target Companies</span>
+        <span class="nav-badges"><span class="nav-count">${TARGETS.length}</span></span>
+      </div>
       <div class="nav-divider"></div>`;
 
     el.innerHTML = allItem + LANES.map(l => {
@@ -782,6 +903,7 @@
 
   function renderMain() {
     const el = document.getElementById('mainPane');
+    if (activeLane === TARGETS_ID) { renderTargets(el); return; }
     const isAll = activeLane === ALL_LANES_ID;
     const lane = isAll ? null : LANES.find(l => l.id === activeLane);
     const anyFetched = Object.keys(liveData).length > 0;
@@ -807,7 +929,7 @@
         <div class="lane-header-top">
           <div>
             <h1 class="lane-title">All Lanes</h1>
-            <div class="lane-sub">Every live posting across all 12 lanes, pooled and filterable</div>
+            <div class="lane-sub">Every live posting across all 13 lanes, pooled and filterable</div>
           </div>
         </div>
       </div>` : `
@@ -1191,7 +1313,8 @@
     'https://www.indeed.com/q-healthcare-it-analyst-l-massachusetts-jobs.html',
     'https://www.indeed.com/q-cloud-security-engineer-l-boston,-ma-jobs.html',
     'https://www.indeed.com/q-clinical-applications-specialist-l-massachusetts-jobs.html',
-    'https://www.indeed.com/q-network-engineer-l-massachusetts-jobs.html'
+    'https://www.indeed.com/q-network-engineer-l-massachusetts-jobs.html',
+    'https://www.indeed.com/jobs?q=ophthalmic+field+service&l=Massachusetts'
   ];
   function showToast(msg) {
     const t = document.getElementById('toast');
@@ -1207,7 +1330,7 @@
       : `Opened ${opened}/${PRIMARY_SEARCHES.length} — allow pop-ups for this page`);
   });
   document.getElementById('copyPromptBtn').addEventListener('click', async () => {
-    const prompt = "Refresh my job search dashboard — pull current postings for all 12 lanes (NOC/IT, Field Service, Cybersecurity/SOC, E911/NG911, Desktop Support, UN/NGO, Medical Device Cybersecurity/HTM, BMET/Clinical Engineering, Healthcare IT/Epic, Cloud Security Engineer, Clinical Applications/Device Specialist, Network Engineer) in Massachusetts/New England, $80K+ where applicable, and rebuild the dashboard cards with real current listings.";
+    const prompt = "Refresh my job search dashboard — pull current postings for all 13 lanes (NOC/IT, Field Service, Cybersecurity/SOC, E911/NG911, Desktop Support, UN/NGO, Medical Device Cybersecurity/HTM, BMET/Clinical Engineering, Healthcare IT/Epic, Cloud Security Engineer, Clinical Applications/Device Specialist, Network Engineer, Ophthalmic/Eye-Care Device & IT) in Massachusetts/New England, $80K+ where applicable, and rebuild the dashboard cards with real current listings.";
     try { await navigator.clipboard.writeText(prompt); showToast('✓ Copied — paste into a chat with Claude'); }
     catch (e) { showToast('Could not copy — select manually'); }
   });
@@ -1373,7 +1496,7 @@
     if (document.getElementById('scoutBackdrop').classList.contains('open')) return;
     const tag = (document.activeElement.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
-    const navIds = [ALL_LANES_ID, ...LANES.map(l => l.id)];
+    const navIds = [ALL_LANES_ID, TARGETS_ID, ...LANES.map(l => l.id)];
     const idx = navIds.indexOf(activeLane);
     if (e.key === 'ArrowDown') { e.preventDefault(); selectLane(navIds[Math.min(idx + 1, navIds.length - 1)]); }
     if (e.key === 'ArrowUp') { e.preventDefault(); selectLane(navIds[Math.max(idx - 1, 0)]); }
