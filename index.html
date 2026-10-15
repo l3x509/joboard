@@ -2295,7 +2295,7 @@
         .slice(0, boardSettings.stripN);
       cards = ranked.map(j => ({
         id: j.id, title: j.title, company: j.company, url: j.url, laneId: j.laneId, laneTitle: j.laneTitle,
-        meta: `${formatSalary(j.rawSalaryMin, j.rawSalaryMax)}${j.created ? ' · ' + postedAgoLabel(j.created) : ''}`,
+        meta: `${formatSalary(j.rawSalaryMin, j.rawSalaryMax)}${j.created ? ' · ' + postedAgoLabel(j.created) : ''} · via ${(j.source || 'Adzuna').replace(/ \((Greenhouse|Lever|Ashby|SmartRecruiters)\)$/, ' careers')}`,
         why: j.fit.hits.slice(0, 2).join(', '), blockers: j.fit.blockers,
         _fit: j.fit.score, _new: newIds.has(String(j.id)), _starred: !!starredPostings[j.id], _lanes: j.lanes.size,
       }));
