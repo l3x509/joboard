@@ -747,7 +747,7 @@
       proof: 'Six-state field territory, scheduling around clinic hours' },
     { id: 'noc', label: 'NOC / monitoring', re: /\b(noc|network operations|network monitoring|infrastructure monitoring|solarwinds|24x7|24\/7|uptime)\b/i,
       proof: '8 years 24x7 NOC on NG911, 99%+ SLA, SolarWinds' },
-    { id: 'cld', label: 'Cloud', re: /\b(azure|aws|cloud|microsoft 365|m365|office 365)\b/i,
+    { id: 'cld', label: 'Cloud', re: /\b(azure|aws|gcp|google cloud|cloud|microsoft 365|m365|office 365)\b/i,
       proof: 'Azure VM right-sizing, AZ-500 background, hands-on AWS' },
     { id: 'sys', label: 'Systems / endpoint', re: /\b(active directory|windows (server|1[01])|group policy|reimag\w*|(computer|laptop|workstation|pc|system) imaging|sccm|intune|mdt|vmware|esxi|linux|desktop support|end.user)\b/i,
       proof: 'AD lifecycle and migration, WDS/MDT imaging, VMware, daily Linux' },
@@ -771,17 +771,26 @@
     { label: 'Epic certification', re: /\bepic (certif|certified)/i, status: 'none' },
   ];
   // Skills he has, and commonly-requested ones not on his profile
+  // Built from his confirmed skills inventory (resumes + his own confirmations, Oct 15 2026)
   const SKILLS_HAVE = [
     ['Windows 10/11', /\bwindows (10|11)\b/i], ['Active Directory', /\bactive directory\b/i], ['Cisco', /\bcisco\b/i],
-    ['Azure', /\bazure\b/i], ['AWS', /\baws\b/i], ['VMware', /\bvmware|esxi|vsphere\b/i], ['Linux', /\blinux|rhel|ubuntu|centos\b/i],
-    ['Microsoft 365', /\b(microsoft|office) 365|m365\b/i], ['Firewalls', /\bfirewalls?\b/i], ['VoIP', /\bvoip\b/i],
-    ['DICOM / PACS', /\bdicom|pacs\b/i], ['SolarWinds', /\bsolarwinds\b/i], ['CrowdStrike / Sentinel / Qualys', /\bcrowdstrike|sentinel|qualys\b/i],
-    ['Ticketing (Autotask etc.)', /\bautotask|ticketing|connectwise\b/i],
+    ['Azure', /\bazure\b/i], ['AWS', /\baws\b|amazon web services/i], ['Google Cloud', /\bgcp\b|google cloud/i],
+    ['VMware', /\bvmware|esxi|vsphere\b/i], ['Linux', /\blinux|rhel|ubuntu|centos|kali\b/i], ['macOS', /\bmac ?os\b/i],
+    ['Microsoft 365', /\b(microsoft|office) 365|m365\b/i], ['PowerShell', /\bpowershell\b/i],
+    ['Firewalls (Fortinet etc.)', /\bfirewalls?|fortinet|fortigate|barracuda\b/i], ['VoIP / CUCM', /\bvoip|cucm\b/i],
+    ['DICOM / PACS', /\bdicom|pacs\b/i], ['SolarWinds', /\bsolarwinds\b/i],
+    ['Sentinel / CrowdStrike / Qualys / Nessus', /\bcrowdstrike|sentinel|qualys|nessus\b/i],
+    ['ServiceNow / Remedy / Autotask', /\bservicenow|remedy|autotask|footprints|track-?it|ticketing\b/i],
+    ['MFA / SSO / IAM', /\bmfa|multi-?factor|sso|single sign-?on|identity and access\b/i],
+    ['Imaging (WDS/MDT)', /\bwds|mdt|reimag\w*|clonezilla\b/i],
   ];
+  // Confirmed gaps or never-mentioned skills employers ask for
   const SKILLS_GAP = [
-    ['ServiceNow', /\bservicenow\b/i], ['PowerShell / scripting', /\bpowershell|scripting|bash scripting\b/i], ['Python', /\bpython\b/i],
+    ['Python', /\bpython\b/i], ['Wireless / WLAN', /\b(wireless|wlan|wi-?fi|meraki|aruba)\b/i],
     ['Intune / SCCM / MECM', /\bintune|sccm|mecm|endpoint manager\b/i], ['Splunk', /\bsplunk\b/i], ['Palo Alto', /\bpalo alto\b/i],
     ['CMMS (device inventory)', /\bcmms\b/i], ['Epic EHR', /\bepic\b/i], ['Electrical / soldering', /\bschematic|soldering|electrical safety\b/i],
+    ['Team management', /\b(manage|supervise|lead) a team|people management|direct reports\b/i],
+    ['Terraform / Kubernetes', /\bterraform|kubernetes|k8s\b/i],
   ];
   const BARRIERS = [
     ['Bachelor\'s required', /\b(bachelor'?s?( degree)? (is )?required|requires a bachelor|must have a bachelor|b\.?s\.? (degree )?required)/i],
@@ -1019,7 +1028,7 @@
         <div class="isec">
           <div class="isec-h">Asked for, not on your profile</div>
           ${gapRows.length ? gapRows.map(r => bar(r.label, r.n, gapRows[0].n)).join('') : '<div class="pane-empty">None showing up in this pull.</div>'}
-          <div class="inote">If you've used any of these (PowerShell scripts on upgrades, for example), add them to your resume.</div>
+          <div class="inote">Python and wireless are your confirmed gaps. If any other item here is something you've actually used, tell Scout and add it to your resume.</div>
         </div>
       </div>
 
@@ -1483,15 +1492,21 @@
     { w: 14, label: 'NOC operations', re: /\b(noc|network operations( center)?)\b/i },
     { w: 22, label: 'NG911/E911 experience', re: /\b(ng911|e911|next generation 911|psap|emergency communications)\b/i },
     { w: 20, label: 'Sentinel/CrowdStrike/Qualys', re: /\b(microsoft sentinel|azure sentinel|crowdstrike|qualys|nessus|falcon)\b/i },
+    { w: 10, label: 'Fortinet / Trend Micro / Barracuda', re: /\b(fortinet|fortigate|trend micro|barracuda)\b/i },
     { w: 18, label: 'SOC / vulnerability work', re: /\b(soc analyst|security operations|vulnerability (management|assessment|scanning)|incident response|threat detection|siem)\b/i },
     { w: 18, label: 'Azure security & IAM', re: /\b(entra id|azure ad|az-500|conditional access|privileged identity|rbac|key vault|defender for cloud)\b/i },
-    { w: 14, label: 'Azure / cloud', re: /\b(azure|microsoft cloud)\b/i },
+    { w: 14, label: 'Azure / AWS / GCP', re: /\b(azure|microsoft cloud|aws|amazon web services|gcp|google cloud)\b/i },
     { w: 14, label: 'field service engineering', re: /\b(field service|field engineer|on-?site (service|support))\b/i },
     { w: 12, label: 'network engineering', re: /\b(ccna|cisco|routing and switching|ospf|bgp|network engineer|solarwinds|network monitoring|fortinet|firewalls?)\b/i },
     { w: 12, label: 'FDA / regulated environment', re: /\b(fda|21 cfr|hipaa|regulated environment|change control|audit trail|joint commission|nist)\b/i },
     { w: 10, label: 'VMware / virtualization', re: /\b(vmware|esxi|vsphere|hyper-?v|virtualization)\b/i },
-    { w: 10, label: 'Windows / AD administration', re: /\b(active directory|windows server|group policy|windows 1[01]|sccm|intune)\b/i },
-    { w: 8,  label: 'ticketing / ITSM', re: /\b(autotask|servicenow|ticketing system|itsm|remedy)\b/i },
+    { w: 10, label: 'Windows / AD administration', re: /\b(active directory|windows server|group policy|windows 1[01]|microsoft 365|office 365|m365)\b/i },
+    { w: 8,  label: 'PowerShell', re: /\bpowershell\b/i },
+    { w: 8,  label: 'Linux / macOS', re: /\b(linux|rhel|red hat|centos|ubuntu|kali|macos|mac os)\b/i },
+    { w: 8,  label: 'imaging / OS migration', re: /\b(wds|mdt|clonezilla|ghost|reimag\w*|os migration|windows (7|10|11) migration|domain migration|mail migration)\b/i },
+    { w: 10, label: 'VoIP / CUCM', re: /\b(voip|cucm|call manager|unified communications)\b/i },
+    { w: 10, label: 'identity & access (MFA/SSO)', re: /\b(mfa|multi-?factor|sso|single sign-?on|identity and access|iam)\b/i },
+    { w: 8,  label: 'ticketing / ITSM', re: /\b(autotask|servicenow|ticketing system|itsm|remedy|footprints|track-?it)\b/i },
     { w: 8,  label: 'desktop / end-user support', re: /\b(desktop support|end user support|help ?desk|service desk|technical support)\b/i },
     { w: 7,  label: 'Security+ / CompTIA', re: /\b(security\+|network\+|comptia|cysa)\b/i },
     { w: 6,  label: 'French/Creole an asset', re: /\b(bilingual|multilingual|french|haitian|creole)\b/i },
