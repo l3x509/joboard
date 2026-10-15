@@ -1364,6 +1364,7 @@
   function renderNav() {
     const el = document.getElementById('navRail');
     const allCount = filteredJobsForLane(ALL_LANES_ID).length;
+    updateLiveStatus(allCount);
     const anyFetched = Object.keys(liveData).length > 0;
 
     const allItem = `
@@ -1882,6 +1883,32 @@
   }
 
   // ===== Live fetch =====
+  // Explains the gap between what Adzuna returned and what the board shows:
+  // raw fetched → unique postings → shown after your filters.
+  let lastFetchedTotal = null;
+  function updateLiveStatus(shownCount) {
+    if (lastFetchedTotal === null) return;
+    const all = jobsForLane(ALL_LANES_ID);
+    const uniqueKeys = new Set(all.map(dedupeKey));
+    const unique = uniqueKeys.size;
+    const shown = typeof shownCount === 'number' ? shownCount : filteredJobsForLane(ALL_LANES_ID).length;
+    const seen = new Set(); let unrelated = 0, dismissed = 0;
+    all.forEach(j => { const k = dedupeKey(j); if (seen.has(k)) return; seen.add(k);
+      if (filters.hideIrrelevant && isIrrelevantRole(j.title)) unrelated++;
+      else if (!filters.showDismissed && dismissedIds[j.id]) dismissed++; });
+    const other = Math.max(0, unique - shown - unrelated - dismissed);
+    setApiStatus(`✓ Live — ${lastFetchedTotal} fetched · ${unique} unique · ${shown} shown`, true);
+    const el = document.getElementById('apiStatus');
+    el.title = `${lastFetchedTotal} postings returned by Adzuna across all lanes\n` +
+      `− ${lastFetchedTotal - unique} duplicates (same job found by several lanes, or agency reposts)\n` +
+      `= ${unique} unique postings\n` +
+      `− ${unrelated} hidden as unrelated\n` +
+      `− ${dismissed} dismissed by you\n` +
+      `− ${other} hidden by other filters (senior, degree, clearance, fit, pay, age, keyword)\n` +
+      `= ${shown} shown in All Lanes\n\nSee each one in ☰ Advanced → Filtered out.`;
+    el.style.cursor = 'help';
+  }
+
   function setApiStatus(msg, ok) {
     const el = document.getElementById('apiStatus');
     el.textContent = msg;
@@ -1902,7 +1929,8 @@
         total += (laneResult.jobs || []).length;
       });
       computeNewSinceLastVisit(jobsByLane);
-      setApiStatus(`✓ Live — ${total} postings loaded`, true);
+      lastFetchedTotal = total;
+      updateLiveStatus();
       renderNav();
       renderMain();
       renderWeekStrip();
