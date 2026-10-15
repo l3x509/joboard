@@ -275,6 +275,39 @@
   .rel.moderate .rel-f { background: var(--amber); } .rel.moderate b { color: var(--amber); }
   .rel.weak .rel-f { background: var(--text-faint); } .rel.weak b { color: var(--text-faint); }
   .curated-card-rel { margin-top: 6px; }
+  /* ===== ☰ Advanced drawer ===== */
+  .tb-btn.adv-open { border-color: var(--line); }
+  .adv-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 60; display: flex; justify-content: flex-end; }
+  .adv-backdrop[hidden] { display: none; }
+  .adv-drawer { width: min(760px, 100vw); height: 100%; background: var(--rail); border-left: 1px solid var(--line); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); }
+  .adv-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 16px 20px 10px; }
+  .adv-title { font-size: 18px; font-weight: 600; color: var(--text); }
+  .adv-sub { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+  .adv-tabs { display: flex; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .adv-tab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); font: inherit; font-family: var(--mono); font-size: 12px; padding: 10px 12px; cursor: pointer; white-space: nowrap; }
+  .adv-tab[aria-selected="true"] { color: var(--amber); border-bottom-color: var(--amber); }
+  .adv-tab:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+  .adv-body { flex: 1; overflow-y: auto; padding: 16px 20px 32px; padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }
+  .adv-sec { margin-bottom: 22px; }
+  .adv-sec h3 { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--amber); font-weight: 400; margin: 0 0 8px; }
+  .adv-note { font-size: 12px; color: var(--text-faint); margin: 0 0 10px; line-height: 1.5; }
+  .adv-row { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text-dim); }
+  .adv-row b { color: var(--text); font-weight: 500; }
+  .adv-row small { display: block; color: var(--text-faint); font-size: 11px; margin-top: 2px; }
+  .adv-row a { color: var(--teal); }
+  .adv-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .adv-reason { font-family: var(--mono); font-size: 10px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 3px; color: var(--text-faint); margin-left: 6px; white-space: nowrap; }
+  .adv-set { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .adv-set label { font-size: 13px; color: var(--text); }
+  .adv-set small { display: block; font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+  .adv-set select, .adv-set input[type="number"], .adv-set input[type="date"] { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; font-family: var(--mono); font-size: 12px; }
+  .adv-set input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--amber); }
+  .adv-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .adv-empty { font-size: 12px; color: var(--text-faint); padding: 8px 0; }
+  .adv-body .igap { grid-template-columns: 1fr 1fr; }
+  .adv-body .igap-head { display: none; }
+  .adv-body .igap-t, .adv-body .igap-a { grid-column: 1 / -1; }
+  .adv-body .igap-a { flex-direction: row; }
   .curated-card-why { margin-top: 4px; font-size: 11px; color: var(--text-faint); line-height: 1.4; }
   .curated-card-link { display: inline-block; margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--amber); text-decoration: none; }
   .curated-card-link:hover { text-decoration: underline; }
@@ -547,6 +580,7 @@
       <button class="tb-btn" id="checkAllBtn">⚡ Check All Boards</button>
       <button class="tb-btn scout" id="openScoutBtn">💬 Ask the Scout</button>
       <button class="tb-btn primary" id="copyPromptBtn">📋 Copy Refresh Request</button>
+      <button class="tb-btn adv-open" id="openAdvBtn" aria-haspopup="dialog" aria-controls="advDrawer" title="Filtered-out jobs, skill gaps, settings, backup">☰ Advanced</button>
       <div class="topbar-clock">
         <div class="live"><span class="live-dot"></span>ACTIVE</div>
         <div id="clockTime">--:--:--</div>
@@ -603,6 +637,22 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="adv-backdrop" id="advBackdrop" hidden>
+  <aside class="adv-drawer" id="advDrawer" role="dialog" aria-modal="true" aria-labelledby="advTitle">
+    <div class="adv-head">
+      <div><div class="adv-title" id="advTitle">Advanced</div><div class="adv-sub">Filtered-out jobs, skill gaps, settings and backup</div></div>
+      <button class="scout-close-btn" id="advCloseBtn">✕ Close</button>
+    </div>
+    <div class="adv-tabs" role="tablist">
+      <button role="tab" class="adv-tab" data-advtab="filtered">Filtered out</button>
+      <button role="tab" class="adv-tab" data-advtab="gaps">Skill gaps</button>
+      <button role="tab" class="adv-tab" data-advtab="settings">Settings</button>
+      <button role="tab" class="adv-tab" data-advtab="data">Data</button>
+    </div>
+    <div class="adv-body" id="advBody"></div>
+  </aside>
+</div>
 
 <div class="scout-backdrop" id="scoutBackdrop">
   <div class="scout-modal">
@@ -753,6 +803,20 @@
   const INTEL_ID = '__intel__';
   const TARGETS_TOUCHED_KEY = 'targets-touched-v1';
   const INTEL_PREFS_KEY = 'intel-prefs-v1';
+  // Board-wide settings managed from ☰ Advanced → Settings
+  const BOARD_SETTINGS_KEY = 'board-settings-v1';
+  const BOARD_DEFAULTS = { stripMin: 22, stripN: 12, staleDays: 10, hideDegree: false, hideClearance: false, landing: '__intel__' };
+  let boardSettings = { ...BOARD_DEFAULTS, ...((() => { try { return JSON.parse(localStorage.getItem(BOARD_SETTINGS_KEY) || '{}'); } catch (e) { return {}; } })()) };
+  function saveBoardSettings() { try { localStorage.setItem(BOARD_SETTINGS_KEY, JSON.stringify(boardSettings)); } catch (e) {} }
+  const DEGREE_REQ_RE = /\b(bachelor'?s?( degree)? (is )?required|requires a bachelor|must have a bachelor|b\.?s\.? (degree )?required)/i;
+  const CLEARANCE_RE = /\b(ts\/sci|top secret|active (security )?clearance|secret clearance)\b/i;
+  // Hidden by a board setting (degree / clearance), separate from "unrelated"
+  function hiddenBySetting(j) {
+    const t = `${j.title || ''} ${j.fullText || j.desc || ''}`;
+    if (boardSettings.hideDegree && DEGREE_REQ_RE.test(t) && !/or equivalent/i.test(t)) return "bachelor's required";
+    if (boardSettings.hideClearance && CLEARANCE_RE.test(t)) return 'clearance required';
+    return null;
+  }
   function loadJSON(k, d) { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
   function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
@@ -864,7 +928,7 @@
       if (!d || !d.jobs) return;
       d.jobs.forEach(raw => {
         const j = normalizeJob(raw, l.id);
-        if (isIrrelevantRole(j.title) || dismissedIds[j.id]) return;
+        if ((filters.hideIrrelevant && isIrrelevantRole(j.title)) || (!filters.showDismissed && dismissedIds[j.id]) || (filters.hideSenior && isSeniorRole(j.title)) || hiddenBySetting(j)) return;
         const k = dedupeKey(j);
         const hit = byId.get('id:' + j.id) || byId.get(k);
         if (hit) { hit.lanes.add(l.id); return; }
@@ -878,6 +942,21 @@
   }
 
   let intelFocus = null; // [clusterA, clusterB] selected from the heatmap/niche cards
+
+  function computeGapRows(jobs) {
+    const textOf = j => `${j.title} ${j.fullText || j.desc}`;
+    const haveOverrides = loadJSON(SKILL_OVERRIDE_KEY, {});
+    const good = jobs.filter(j => j.fit.score >= 22);
+    const gapRows = GAP_CATALOG.filter(g => !haveOverrides[g.label]).map(g => {
+      const hits = jobs.filter(j => g.re.test(textOf(j)));
+      const goodHits = hits.filter(j => j.fit.score >= 22);
+      const laneN = {}; hits.forEach(j => j.lanes.forEach(l => { laneN[l] = (laneN[l] || 0) + 1; }));
+      return { ...g, hits, n: hits.length, goodN: goodHits.length,
+        lanes: Object.entries(laneN).sort((x, y) => y[1] - x[1]).slice(0, 2).map(x => laneLabel(x[0])),
+        impact: goodHits.length * 2 + hits.length };
+    }).filter(g => g.n).sort((x, y) => y.impact - x.impact);
+    return { gapRows, good, haveOverrides };
+  }
 
   function renderIntel(el) {
     const jobs = intelJobs();
@@ -898,7 +977,7 @@
     const touched = loadJSON(TARGETS_TOUCHED_KEY, {});
     const tStatus = loadTargetStatus();
     const outreachThisWeek = Object.entries(touched).filter(([n, at]) => new Date(at).getTime() >= weekAgo && ['Contacted', 'Applied', 'Interview'].includes(tStatus[n])).length;
-    const staleLeads = leads.filter(l => { const d = daysSince(l.lastStatusChange || l.dateAdded); return d !== null && d >= STALE_DAYS && ['New', 'Applied'].includes(l.status); }).length;
+    const staleLeads = leads.filter(l => { const d = daysSince(l.lastStatusChange || l.dateAdded); return d !== null && d >= boardSettings.staleDays && ['New', 'Applied'].includes(l.status); }).length;
     const daysLeft = prefs.endDate ? Math.ceil((new Date(prefs.endDate + 'T23:59:59') - new Date()) / 86400000) : null;
 
     // ---- market stats ----
@@ -936,17 +1015,7 @@
     const textOf = j => `${j.title} ${j.fullText || j.desc}`;
     const certRows = CERTS.map(c => ({ ...c, n: jobs.filter(j => c.re.test(textOf(j))).length })).sort((x, y) => y.n - x.n);
     const haveRows = SKILLS_HAVE.map(([label, re]) => ({ label, n: jobs.filter(j => re.test(textOf(j))).length })).sort((x, y) => y.n - x.n);
-    const haveOverrides = loadJSON(SKILL_OVERRIDE_KEY, {});
-    const good = jobs.filter(j => j.fit.score >= 22);
-    const gapRows = GAP_CATALOG.filter(g => !haveOverrides[g.label]).map(g => {
-      const hits = jobs.filter(j => g.re.test(textOf(j)));
-      const goodHits = hits.filter(j => j.fit.score >= 22);
-      const laneN = {}; hits.forEach(j => j.lanes.forEach(l => { laneN[l] = (laneN[l] || 0) + 1; }));
-      return { ...g, hits, n: hits.length, goodN: goodHits.length,
-        lanes: Object.entries(laneN).sort((x, y) => y[1] - x[1]).slice(0, 2).map(x => laneLabel(x[0])),
-        impact: goodHits.length * 2 + hits.length };
-    }).filter(g => g.n).sort((x, y) => y.impact - x.impact);
-    const maxGap = gapRows.length ? gapRows[0].n : 1;
+    const { gapRows, good } = computeGapRows(jobs);
     const barrierRows = BARRIERS.map(([label, re]) => ({ label, n: jobs.filter(j => re.test(textOf(j))).length }));
     const contractN = jobs.filter(j => j.contractType === 'contract').length;
     const typedN = jobs.filter(j => j.contractType).length;
@@ -978,7 +1047,7 @@
     if (bestOverlap) moves.push(`Apply: <b>${escapeHtml(bestOverlap.title)}</b> at ${escapeHtml(companyName(bestOverlap))} — hits ${bestOverlap.tags.map(t => CL[t].label).join(' + ')}. Lead with: ${escapeHtml(CL[bestOverlap.tags[0]].proof)}.`);
     const nextTarget = TARGETS.filter(t => t.f === 'A' && !tStatus[t.n]).sort((a, b) => 0)[0];
     if (nextTarget) moves.push(`Reach out: <b>${escapeHtml(nextTarget.n)}</b> — ${escapeHtml(nextTarget.m)}`);
-    if (staleLeads) moves.push(`Follow up on <b>${staleLeads}</b> lead${staleLeads > 1 ? 's' : ''} with no movement in ${STALE_DAYS}+ days. A short check-in email often restarts a stalled application.`);
+    if (staleLeads) moves.push(`Follow up on <b>${staleLeads}</b> lead${staleLeads > 1 ? 's' : ''} with no movement in ${boardSettings.staleDays}+ days. A short check-in email often restarts a stalled application.`);
     const topGap = gapRows.find(g => g.goodN > 0 && !g.confirmed) || gapRows.find(g => g.goodN > 0);
     if (topGap) moves.push(`Biggest skill gap in your best matches: <b>${escapeHtml(topGap.label)}</b> (in ${topGap.goodN} of ${good.length} possible/strong-fit postings). ${escapeHtml(topGap.close)}`);
     const topLapsed = certRows.find(c => c.status === 'lapsed' && c.n > 0);
@@ -1029,11 +1098,11 @@
       <div class="isec">
         <div class="isec-h">Search momentum</div>
         <div class="ikpis">
-          ${kpi(`${appliedThisWeek}<small>/${prefs.weeklyGoal}</small>`, 'Applications this week', `<label>Goal <input id="iGoal" type="number" min="1" max="50" value="${prefs.weeklyGoal}"></label>`, appliedThisWeek >= prefs.weeklyGoal ? 'good' : '')}
+          ${kpi(`${appliedThisWeek}<small>/${prefs.weeklyGoal}</small>`, 'Applications this week', 'Goal set in ☰ Advanced', appliedThisWeek >= prefs.weeklyGoal ? 'good' : '')}
           ${kpi(outreachThisWeek, 'Target companies contacted this week', 'From Target Companies statuses')}
           ${kpi(sentOut ? pct(responses, sentOut) + '%' : '—', 'Response rate', sentOut ? `${responses} interview/offer from ${sentOut} sent${sentOut < 10 ? ' · small sample' : ''}` : 'Mark leads Applied to start measuring')}
-          ${kpi(staleLeads, 'Stale leads', `No movement ${STALE_DAYS}+ days`, staleLeads ? 'warn' : '')}
-          ${kpi(daysLeft !== null ? (daysLeft >= 0 ? daysLeft : 'ended') : '—', 'Days left on Zeiss contract', `<label>End date <input id="iEnd" type="date" value="${escapeAttr(prefs.endDate)}"></label>`, daysLeft !== null && daysLeft <= 30 ? 'warn' : '')}
+          ${kpi(staleLeads, 'Stale leads', `No movement ${boardSettings.staleDays}+ days`, staleLeads ? 'warn' : '')}
+          ${kpi(daysLeft !== null ? (daysLeft >= 0 ? daysLeft : 'ended') : '—', 'Days left on Zeiss contract', prefs.endDate ? `Ends ${escapeHtml(prefs.endDate)} · edit in ☰ Advanced` : 'Set the end date in ☰ Advanced', daysLeft !== null && daysLeft <= 30 ? 'warn' : '')}
         </div>
         <div class="ifunnel">${['New', 'Applied', 'Interview', 'Offer', 'Rejected'].map(s => `<div class="if-s"><b>${byStatus(s)}</b><span>${s}</span></div>`).join('<span class="if-a">→</span>')}</div>
       </div>
@@ -1083,20 +1152,7 @@
         </div>
       </div>
 
-      <div class="isec">
-        <div class="isec-h">Skill gaps across your market <span class="isec-sub">skills employers ask for that aren't on your profile · ranked by how often they appear in jobs you fit</span></div>
-        ${gapRows.length ? `<div class="igaps">
-          <div class="igap igap-head"><span>Skill</span><span>Postings</span><span>In your fit jobs</span><span>How to close it</span><span></span></div>
-          ${gapRows.map(g => `<div class="igap ${intelGapFocus === g.label ? 'on' : ''}">
-            <span class="igap-n"><b>${escapeHtml(g.label)}</b>${g.confirmed ? '<span class="ichip ichip-lapsed">confirmed gap</span>' : ''}<small>${g.lanes.map(escapeHtml).join(' · ')}</small></span>
-            <span class="igap-c"><span class="ib-t"><span class="ib-f" style="width:${Math.max(4, 100 * g.n / maxGap)}%"></span></span><b>${g.n}</b><small>${pct(g.n, jobs.length)}%</small></span>
-            <span class="igap-g"><b>${g.goodN}</b><small>of ${good.length}</small></span>
-            <span class="igap-t">${escapeHtml(g.close)}</span>
-            <span class="igap-a"><button class="curated-collapse-btn" data-igap="${escapeAttr(g.label)}">Postings ↑</button>${g.confirmed ? '' : `<button class="curated-collapse-btn" data-ihave="${escapeAttr(g.label)}" title="Move this to skills you have">I have this</button>`}</span>
-          </div>`).join('')}
-        </div>` : '<div class="pane-empty">No gaps showing up in this pull.</div>'}
-        ${Object.keys(haveOverrides).length ? `<div class="inote">Marked as yours: ${Object.keys(haveOverrides).map(escapeHtml).join(', ')} · <button class="filter-clear" id="iResetHave">Undo</button> · Add these to your resume and tell Scout.</div>` : ''}
-      </div>
+      <div class="inote">Skill gaps, filtered-out jobs and board settings are under <button class="filter-clear" data-open-adv="gaps">☰ Advanced</button>.</div>
 
       <div class="isec">
         <div class="isec-h">Lane scoreboard <span class="isec-sub">ranked by strong-fit and overlap volume</span></div>
@@ -1138,8 +1194,6 @@
       renderIntel(el); showToast('Moved to your skills. Add it to your resume too.');
     }));
     const rh = document.getElementById('iResetHave'); if (rh) rh.addEventListener('click', () => { saveJSON(SKILL_OVERRIDE_KEY, {}); renderIntel(el); });
-    const goal = document.getElementById('iGoal'); if (goal) goal.addEventListener('change', () => { prefs.weeklyGoal = Math.max(1, parseInt(goal.value) || 10); saveJSON(INTEL_PREFS_KEY, prefs); renderIntel(el); });
-    const end = document.getElementById('iEnd'); if (end) end.addEventListener('change', () => { prefs.endDate = end.value; saveJSON(INTEL_PREFS_KEY, prefs); renderIntel(el); });
     el.querySelectorAll('[data-golane]').forEach(r => r.addEventListener('click', () => selectLane(r.getAttribute('data-golane'))));
     el.querySelectorAll('[data-track]').forEach(btn => btn.addEventListener('click', () => { const p = JSON.parse(btn.getAttribute('data-track')); prefillLead(p.title, p.company, p.url, p.laneId); }));
     el.querySelectorAll('[data-star-inline]').forEach(btn => btn.addEventListener('click', () => toggleStar(JSON.parse(btn.getAttribute('data-star-inline')))));
@@ -1150,7 +1204,7 @@
   let starredPostings = {};   // { jobId: {id, title, company, url, meta, laneId, laneTitle} }
   let newPostings = [];       // [{id, title, company, url, meta, laneId, laneTitle, created}]
   let dismissedIds = {};      // { jobId: true } — hidden from all views until un-dismissed
-  let activeLane = INTEL_ID; // land on Niche Intel
+  let activeLane = boardSettings.landing || INTEL_ID; // set in ☰ Advanced → Settings
   let leads = [];
 
   // ===== Filters & sort (applied to live postings across all views) =====
@@ -1170,6 +1224,8 @@
     hideSenior: false,    // hide Lead/Manager/Director/Principal-level roles
     groupDuplicates: true, // collapse staffing-agency reposts of the same role
   };
+  const FILTER_DEFAULTS = { ...filters };
+
 
   function loadFilterState() {
     try { dismissedIds = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '{}'); } catch (e) { dismissedIds = {}; }
@@ -1252,6 +1308,7 @@
     }
 
     if (filters.hideSenior && isSeniorRole(job.title)) return false;
+    if (hiddenBySetting(job)) return false;
 
     if (filters.minFit > 0 && scoreFit(job).score < filters.minFit) return false;
 
@@ -1614,28 +1671,37 @@
   const TECH_KEEP = /\b(field|service|engineer\w*|equipment|repair|install\w*|biomedical|bmet|htm|it|ict|systems?|network\w*|informatics|analyst|administrator|support|automation|cyber\w*|application specialist|technology|devices?)\b/i;
   const IRRELEVANT_RULES = [
     // Driving / delivery — \bdriver\b alone is unsafe ("device driver")
-    { re: /\b(cdl|truck driver|delivery driver|class [ab] driver|tractor trailer|driver helper|courier|chauffeur|bus driver|forklift)\b/i },
+    { label: 'driving / delivery', re: /\b(cdl|truck driver|delivery driver|class [ab] driver|tractor trailer|driver helper|courier|chauffeur|bus driver|forklift)\b/i },
     // Hands-on clinical care (comes in via the medical-device lanes)
-    { re: /\b(registered nurse|rn|lpn|cna|nurse practitioner|medical assistant|phlebotom\w*|caregiver|home health aide|physical therap\w*|occupational therap\w*|respiratory therap\w*|pharmacist|pharmacy tech\w*|dental (hygienist|assistant)|physician|surgeon|radiologist|radiologic technologist|rad tech|sonograph\w*|veterinar\w*)\b/i, keep: TECH_KEEP },
+    { label: 'clinical patient care', re: /\b(registered nurse|rn|lpn|cna|nurse practitioner|medical assistant|phlebotom\w*|caregiver|home health aide|physical therap\w*|occupational therap\w*|respiratory therap\w*|pharmacist|pharmacy tech\w*|dental (hygienist|assistant)|physician|surgeon|radiologist|radiologic technologist|rad tech|sonograph\w*|veterinar\w*)\b/i, keep: TECH_KEEP },
     // Clinical eye-care roles needing COA/COT/COMT certification he doesn't hold
-    { re: /\b(ophthalm\w*|optometr\w*|eye ?care|vision|retina\w*)\s+(assistant|technician|tech|technologist|scribe|medical (technician|technologist|assistant)|photographer|surgical tech\w*)\b/i, keep: TECH_KEEP },
-    { re: /\b(coa|cot|comt|certified ophthalmic|optician|refractionist|ophthalmic scribe|optometric|ophthalmology (assistant|technician|tech))\b/i, keep: TECH_KEEP },
+    { label: 'clinical eye care (COA/COT)', re: /\b(ophthalm\w*|optometr\w*|eye ?care|vision|retina\w*)\s+(assistant|technician|tech|technologist|scribe|medical (technician|technologist|assistant)|photographer|surgical tech\w*)\b/i, keep: TECH_KEEP },
+    { label: 'clinical eye care (COA/COT)', re: /\b(coa|cot|comt|certified ophthalmic|optician|refractionist|ophthalmic scribe|optometric|ophthalmology (assistant|technician|tech))\b/i, keep: TECH_KEEP },
     // Physical security (comes in via the cybersecurity lane)
-    { re: /\b(security (guard|officer|screener)|loss prevention|armed guard|patrol officer|police officer|corrections officer)\b/i, keep: /\b(information|cyber\w*|it|data|network|technology|systems)\b/i },
+    { label: 'physical security', re: /\b(security (guard|officer|screener)|loss prevention|armed guard|patrol officer|police officer|corrections officer)\b/i, keep: /\b(information|cyber\w*|it|data|network|technology|systems)\b/i },
     // Restaurant / retail / general labor — "server" only in a food context
-    { re: /\b(cashier|barista|(restaurant|banquet|food|cocktail|catering|dining) server|server\s*\/\s*bartender|bartender|waiter|waitress|line cook|dishwasher|retail associate|sales associate|stocker|warehouse (associate|worker|selector)|janitor|custodian|housekeep\w*|landscap\w*|groundskeep\w*)\b/i },
-    { re: /^\s*servers?\s*$/i }, // a bare "Server" title is a restaurant job
+    { label: 'retail / food / labor', re: /\b(cashier|barista|(restaurant|banquet|food|cocktail|catering|dining) server|server\s*\/\s*bartender|bartender|waiter|waitress|line cook|dishwasher|retail associate|sales associate|stocker|warehouse (associate|worker|selector)|janitor|custodian|housekeep\w*|landscap\w*|groundskeep\w*)\b/i },
+    { label: 'restaurant server', re: /^\s*servers?\s*$/i }, // a bare "Server" title is a restaurant job
     // Trades unrelated to his background
-    { re: /\b(hvac (installer|apprentice)|plumber|electrician apprentice|welder|carpenter|roofer|painter|mason|heavy equipment operator)\b/i },
+    { label: 'unrelated trade', re: /\b(hvac (installer|apprentice)|plumber|electrician apprentice|welder|carpenter|roofer|painter|mason|heavy equipment operator)\b/i },
     // Sales / recruiting (he's stated a preference against outbound sales)
-    { re: /\b(outside sales|door.to.door|insurance agent|real estate agent|leasing (agent|consultant)|telemarketer|recruiter)\b/i },
+    { label: 'sales / recruiting', re: /\b(outside sales|door.to.door|insurance agent|real estate agent|leasing (agent|consultant)|telemarketer|recruiter)\b/i },
     // Other clearly unrelated professions
-    { re: /\b(teacher|substitute teacher|paralegal|accountant|bookkeeper|social worker|childcare|preschool)\b/i, keep: /\b(it|technology|systems)\b/i },
+    { label: 'unrelated profession', re: /\b(teacher|substitute teacher|paralegal|accountant|bookkeeper|social worker|childcare|preschool)\b/i, keep: /\b(it|technology|systems)\b/i },
   ];
-  function isIrrelevantRole(title) {
+  // Titles he rescued from the filter in ☰ Advanced → Filtered out
+  const ALWAYS_SHOW_KEY = 'always-show-titles-v1';
+  function normTitle(t) { return (t || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+  let _alwaysShow = null;
+  function alwaysShowSet() { if (!_alwaysShow) { try { _alwaysShow = JSON.parse(localStorage.getItem(ALWAYS_SHOW_KEY) || '{}'); } catch (e) { _alwaysShow = {}; } } return _alwaysShow; }
+  function saveAlwaysShow(o) { _alwaysShow = o; try { localStorage.setItem(ALWAYS_SHOW_KEY, JSON.stringify(o)); } catch (e) {} }
+  function irrelevantReason(title) {
     const t = title || '';
-    return IRRELEVANT_RULES.some(r => r.re.test(t) && !(r.keep && r.keep.test(t)));
+    if (alwaysShowSet()[normTitle(t)]) return null;
+    const r = IRRELEVANT_RULES.find(r => r.re.test(t) && !(r.keep && r.keep.test(t)));
+    return r ? r.label : null;
   }
+  function isIrrelevantRole(title) { return !!irrelevantReason(title); }
 
   function scoreFit(job) {
     const haystack = `${job.title || ''} ${job.fullText || job.desc || ''}`;
@@ -1921,7 +1987,6 @@
 
   // ===== Lead tracker =====
   const LEADS_KEY = 'leads-v1';
-  const STALE_DAYS = 10;
   function laneLabel(id) {
     const l = LANES.find(x => x.id === id);
     return l ? l.title.split(' / ')[0].split(' (')[0] : id;
@@ -1942,11 +2007,11 @@
     const el = document.getElementById('staleNudge');
     const staleCount = leads.filter(l => {
       const d = daysSince(l.lastStatusChange || l.dateAdded);
-      return d !== null && d >= STALE_DAYS && l.status !== 'Rejected';
+      return d !== null && d >= boardSettings.staleDays && l.status !== 'Rejected';
     }).length;
     if (staleCount > 0) {
       el.style.display = 'block';
-      el.textContent = `⚠ ${staleCount} lead${staleCount > 1 ? 's' : ''} ${staleCount > 1 ? "haven't" : "hasn't"} moved in ${STALE_DAYS}+ days`;
+      el.textContent = `⚠ ${staleCount} lead${staleCount > 1 ? 's' : ''} ${staleCount > 1 ? "haven't" : "hasn't"} moved in ${boardSettings.staleDays}+ days`;
     } else {
       el.style.display = 'none';
     }
@@ -1960,7 +2025,7 @@
     }
     el.innerHTML = leads.map((lead, i) => {
       const staleDays = daysSince(lead.lastStatusChange || lead.dateAdded);
-      const isStale = staleDays !== null && staleDays >= STALE_DAYS && lead.status !== 'Rejected';
+      const isStale = staleDays !== null && staleDays >= boardSettings.staleDays && lead.status !== 'Rejected';
       return `
       <div class="lead ${i === flashIdx ? 'lead-flash' : ''} ${isStale ? 'stale' : ''}">
         <div>${lead.url ? `<a href="${escapeAttr(lead.url)}" target="_blank">${escapeHtml(lead.title || 'Untitled')}</a>` : escapeHtml(lead.title || 'Untitled')}</div>
@@ -2049,6 +2114,7 @@
   // ===== Keyboard nav =====
   document.addEventListener('keydown', (e) => {
     if (document.getElementById('scoutBackdrop').classList.contains('open')) return;
+    if (!document.getElementById('advBackdrop').hidden) return;
     const tag = (document.activeElement.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
     const navIds = [INTEL_ID, ALL_LANES_ID, TARGETS_ID, ...LANES.map(l => l.id)];
@@ -2157,7 +2223,6 @@
 
   // Top strip: the highest-rated fit opportunities in the live pull
   // (deduped, irrelevant and dismissed excluded), or the starred list.
-  const STRIP_TOP_N = 12;
   let stripView = 'top';
   function renderWeekStrip() {
     const sub = document.getElementById('curatedSub');
@@ -2172,9 +2237,9 @@
     if (stripView === 'top') {
       const anyFetched = Object.keys(liveData).length > 0;
       const ranked = intelJobs()
-        .filter(j => j.fit.score >= 22)
+        .filter(j => j.fit.score >= boardSettings.stripMin)
         .sort((x, y) => (y.fit.score - x.fit.score) || (y.tags.length - x.tags.length) || (new Date(y.created || 0) - new Date(x.created || 0)))
-        .slice(0, STRIP_TOP_N);
+        .slice(0, boardSettings.stripN);
       cards = ranked.map(j => ({
         id: j.id, title: j.title, company: j.company, url: j.url, laneId: j.laneId, laneTitle: j.laneTitle,
         meta: `${formatSalary(j.rawSalaryMin, j.rawSalaryMax)}${j.created ? ' · ' + postedAgoLabel(j.created) : ''}`,
@@ -2182,8 +2247,8 @@
         _fit: j.fit.score, _new: newIds.has(String(j.id)), _starred: !!starredPostings[j.id], _lanes: j.lanes.size,
       }));
       sub.textContent = !anyFetched ? 'Loading live postings…'
-        : cards.length ? `Your ${cards.length} best-matching live postings, ranked by fit (22+ only, duplicates removed) · click a card to open its lane`
-        : 'No live posting scores 22+ right now — check back after the next refresh';
+        : cards.length ? `Your ${cards.length} best-matching live postings, ranked by fit (${boardSettings.stripMin}+ only, duplicates removed) · click a card to open its lane`
+        : 'No live posting scores ${boardSettings.stripMin}+ right now — check back after the next refresh';
     } else {
       cards = starredList.map(p => ({ ...p, _fit: weekRelevance(p), _new: newIds.has(String(p.id)), _starred: true }))
         .sort((x, y) => y._fit - x._fit);
@@ -2235,6 +2300,192 @@
     e.target.textContent = collapsed ? '+ Expand' : '– Collapse';
   });
   document.getElementById('clearNewBtn').addEventListener('click', clearNewBadges);
+
+  // ===================================================================
+  // ===== ☰ Advanced drawer: filtered-out jobs, skill gaps, settings, data
+  // ===================================================================
+  let advTab = 'filtered';
+  function refreshBoard() { renderNav(); renderMain(); renderWeekStrip(); if (!document.getElementById('advBackdrop').hidden) renderAdv(); }
+  function openAdv(tab) {
+    if (tab) advTab = tab;
+    const bd = document.getElementById('advBackdrop');
+    bd.hidden = false;
+    renderAdv();
+    const t = document.querySelector(`[data-advtab="${advTab}"]`); if (t) t.focus();
+  }
+  function closeAdv() { document.getElementById('advBackdrop').hidden = true; document.getElementById('openAdvBtn').focus(); }
+
+  function advJobRow(j, reasonHtml, actionsHtml) {
+    return `<div class="adv-row"><div>${j.url ? `<a target="_blank" href="${escapeAttr(j.url)}">${escapeHtml(j.title)}</a>` : `<b>${escapeHtml(j.title)}</b>`}${reasonHtml || ''}
+      <small>${escapeHtml(j.company || '')} · ${escapeHtml(laneLabel(j.laneId))}</small></div><div class="adv-actions">${actionsHtml || ''}</div></div>`;
+  }
+
+  function advFilteredHtml() {
+    const seen = new Set(), byId = {}, unrelated = [], bySetting = [], senior = [];
+    LANES.forEach(l => {
+      const d = liveData[l.id]; if (!d || !d.jobs) return;
+      d.jobs.forEach(raw => {
+        if (seen.has(raw.id)) return; seen.add(raw.id);
+        const j = normalizeJob(raw, l.id); byId[j.id] = j;
+        const why = irrelevantReason(j.title);
+        if (why) { unrelated.push({ j, why }); return; }
+        const st = hiddenBySetting(j);
+        if (st) { bySetting.push({ j, why: st }); return; }
+        if (filters.hideSenior && isSeniorRole(j.title)) senior.push({ j, why: 'senior-level' });
+      });
+    });
+    const anyFetched = Object.keys(liveData).length > 0;
+    const rescued = Object.keys(alwaysShowSet());
+    const dismissed = Object.keys(dismissedIds);
+    const chip = w => `<span class="adv-reason">${escapeHtml(w)}</span>`;
+    return `
+      <div class="adv-sec"><h3>Hidden as unrelated (${unrelated.length})</h3>
+        <p class="adv-note">${filters.hideIrrelevant ? 'These titles matched an unrelated-job rule and are hidden everywhere.' : 'The unrelated filter is OFF in Settings, so these are currently showing.'} If one is actually your kind of job, click <b>Always show</b> and the board stops hiding that title.</p>
+        ${!anyFetched ? '<div class="adv-empty">Live postings haven\'t loaded yet.</div>' : unrelated.length ? unrelated.map(x => advJobRow(x.j, chip(x.why), `<button class="curated-collapse-btn" data-advshow="${escapeAttr(x.j.title)}">Always show</button>`)).join('') : '<div class="adv-empty">Nothing hidden as unrelated in this pull.</div>'}
+      </div>
+      ${rescued.length ? `<div class="adv-sec"><h3>Titles you chose to always show (${rescued.length})</h3>${rescued.map(t => `<div class="adv-row"><div><b>${escapeHtml(t)}</b></div><div class="adv-actions"><button class="curated-collapse-btn" data-advunshow="${escapeAttr(t)}">Remove</button></div></div>`).join('')}</div>` : ''}
+      <div class="adv-sec"><h3>Hidden by your settings (${bySetting.length + senior.length})</h3>
+        <p class="adv-note">Degree, clearance and senior-level hiding are switched in the Settings tab.</p>
+        ${bySetting.length + senior.length ? [...bySetting, ...senior].map(x => advJobRow(x.j, chip(x.why), '')).join('') : '<div class="adv-empty">None.</div>'}
+      </div>
+      <div class="adv-sec"><h3>Dismissed by you (${dismissed.length})</h3>
+        ${dismissed.length ? dismissed.map(id => byId[id] ? advJobRow(byId[id], '', `<button class="curated-collapse-btn" data-advrestore="${escapeAttr(id)}">Restore</button>`)
+          : `<div class="adv-row"><div><b>Posting ${escapeHtml(id)}</b><small>Not in the current live pull</small></div><div class="adv-actions"><button class="curated-collapse-btn" data-advrestore="${escapeAttr(id)}">Restore</button></div></div>`).join('')
+          : '<div class="adv-empty">You haven\'t dismissed anything.</div>'}
+      </div>`;
+  }
+
+  function advGapsHtml() {
+    const jobs = intelJobs();
+    const { gapRows, good, haveOverrides } = computeGapRows(jobs);
+    const maxGap = gapRows.length ? gapRows[0].n : 1;
+    const marked = Object.keys(haveOverrides);
+    if (!Object.keys(liveData).length) return '<div class="adv-empty">Live postings haven\'t loaded yet.</div>';
+    return `
+      <div class="adv-sec"><h3>Skills employers ask for that aren't on your profile</h3>
+        <p class="adv-note">Ranked by how often each appears in jobs you fit (relevance 22+), across ${jobs.length} live postings. <b>Postings</b> opens Niche Intel filtered to jobs asking for that skill.</p>
+        ${gapRows.length ? `<div class="igaps">${gapRows.map(g => `<div class="igap">
+            <span class="igap-n"><b>${escapeHtml(g.label)}</b>${g.confirmed ? '<span class="ichip ichip-lapsed">confirmed gap</span>' : ''}<small>${g.lanes.map(escapeHtml).join(' · ')}</small></span>
+            <span class="igap-c"><span class="ib-t"><span class="ib-f" style="width:${Math.max(4, 100 * g.n / maxGap)}%"></span></span><b>${g.n}</b><small>${pct(g.n, jobs.length)}%</small></span>
+            <span class="igap-g"><b>${g.goodN}</b><small>of ${good.length} fit jobs</small></span>
+            <span class="igap-t">${escapeHtml(g.close)}</span>
+            <span class="igap-a"><button class="curated-collapse-btn" data-advgap="${escapeAttr(g.label)}">Postings →</button>${g.confirmed ? '' : `<button class="curated-collapse-btn" data-advhave="${escapeAttr(g.label)}">I have this</button>`}</span>
+          </div>`).join('')}</div>` : '<div class="adv-empty">No gaps showing up in this pull.</div>'}
+      </div>
+      ${marked.length ? `<div class="adv-sec"><h3>Marked as yours (${marked.length})</h3><p class="adv-note">Add these to your resume and tell Scout.</p>${marked.map(m => `<div class="adv-row"><div><b>${escapeHtml(m)}</b></div><div class="adv-actions"><button class="curated-collapse-btn" data-advunhave="${escapeAttr(m)}">Move back to gaps</button></div></div>`).join('')}</div>` : ''}`;
+  }
+
+  function advSettingsHtml() {
+    const prefs = loadJSON(INTEL_PREFS_KEY, { weeklyGoal: 10, endDate: '' });
+    const chk = (id, on, label, note) => `<div class="adv-set"><label for="${id}">${label}<small>${note}</small></label><input type="checkbox" id="${id}" ${on ? 'checked' : ''}></div>`;
+    const sel = (id, val, label, note, opts) => `<div class="adv-set"><label for="${id}">${label}<small>${note}</small></label><select id="${id}">${opts.map(([v, t]) => `<option value="${v}" ${String(v) === String(val) ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
+    return `
+      <div class="adv-sec"><h3>Job filters <span class="isec-sub">apply to lanes, Niche Intel and Top Fit</span></h3>
+        ${chk('advHideIrr', filters.hideIrrelevant, 'Hide unrelated jobs', 'Drivers, nurses, guards, clinical eye care and similar. Review them in Filtered out.')}
+        ${chk('advHideSenior', filters.hideSenior, 'Hide senior-level roles', 'Lead, Manager, Director, Principal, Architect titles.')}
+        ${chk('advHideDegree', boardSettings.hideDegree, "Hide bachelor's-required postings", 'Keeps postings that accept "or equivalent experience."')}
+        ${chk('advHideClear', boardSettings.hideClearance, 'Hide clearance-required postings', 'TS/SCI, Secret, active clearance.')}
+        ${chk('advGroupDupes', filters.groupDuplicates, 'Group duplicate postings', 'Collapses staffing-agency reposts of the same role.')}
+        ${chk('advShowDismissed', filters.showDismissed, 'Show dismissed postings', 'Bring back everything you dismissed, greyed out.')}
+        ${sel('advMinFit', filters.minFit, 'Minimum fit in lanes', 'Lane lists only.', [[0, 'Any'], [22, 'Possible+ (22)'], [55, 'Strong only (55)']])}
+        ${sel('advMinPay', filters.minSalary, 'Minimum pay in lanes', 'Postings with no salary listed are kept.', [[0, 'Any'], [70000, '$70K+'], [80000, '$80K+'], [100000, '$100K+']])}
+      </div>
+      <div class="adv-sec"><h3>Top Fit strip</h3>
+        ${sel('advStripMin', boardSettings.stripMin, 'Minimum relevance to appear', 'Postings below this never show in the strip.', [[22, '22 · possible fit'], [35, '35'], [45, '45'], [55, '55 · strong fit only']])}
+        ${sel('advStripN', boardSettings.stripN, 'Number of cards', '', [[6, '6'], [12, '12'], [20, '20']])}
+      </div>
+      <div class="adv-sec"><h3>Pipeline</h3>
+        <div class="adv-set"><label for="advGoal">Weekly application goal<small>Shown in Search momentum.</small></label><input type="number" id="advGoal" min="1" max="50" value="${prefs.weeklyGoal}"></div>
+        <div class="adv-set"><label for="advEnd">Zeiss contract end date<small>Drives the countdown in Niche Intel.</small></label><input type="date" id="advEnd" value="${escapeAttr(prefs.endDate || '')}"></div>
+        ${sel('advStale', boardSettings.staleDays, 'Flag a lead as stale after', 'No status change for this many days.', [[7, '7 days'], [10, '10 days'], [14, '14 days'], [21, '21 days']])}
+      </div>
+      <div class="adv-sec"><h3>Board</h3>
+        ${sel('advLanding', boardSettings.landing, 'Open the board on', 'Takes effect next time you load the page.', [[INTEL_ID, 'Niche Intel'], [ALL_LANES_ID, 'All Lanes'], [TARGETS_ID, 'Target Companies']])}
+        <div class="adv-btns" style="margin-top:12px"><button class="curated-collapse-btn" id="advResetSettings">Reset all settings to defaults</button></div>
+      </div>`;
+  }
+
+  function advDataHtml() {
+    const keys = []; try { for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i)); } catch (e) {}
+    return `
+      <div class="adv-sec"><h3>Backup &amp; restore</h3>
+        <p class="adv-note">Everything on this board (leads, stars, statuses, settings, Scout chat) lives in this browser only. Export a backup before clearing your browser or switching computers. ${keys.length} saved items right now.</p>
+        <div class="adv-btns">
+          <button class="curated-collapse-btn" id="advExport">⬇ Export full backup (.json)</button>
+          <label class="curated-collapse-btn" for="advImport" style="cursor:pointer">⬆ Restore from backup</label>
+          <input type="file" id="advImport" accept="application/json,.json" hidden>
+          <button class="curated-collapse-btn" id="advLeadsCsv">⬇ Export leads (.csv)</button>
+        </div>
+        <p class="adv-note" id="advImportMsg" style="margin-top:8px"></p>
+      </div>
+      <div class="adv-sec"><h3>Resets</h3>
+        <div class="adv-btns">
+          <button class="curated-collapse-btn" id="advClearNew">Clear NEW badges</button>
+          <button class="curated-collapse-btn" id="advClearShow">Clear "always show" titles</button>
+          <button class="curated-collapse-btn" id="advClearHave">Move all "I have this" skills back to gaps</button>
+        </div>
+      </div>`;
+  }
+
+  function renderAdv() {
+    document.querySelectorAll('.adv-tab').forEach(t => t.setAttribute('aria-selected', t.getAttribute('data-advtab') === advTab ? 'true' : 'false'));
+    const body = document.getElementById('advBody');
+    body.innerHTML = advTab === 'filtered' ? advFilteredHtml() : advTab === 'gaps' ? advGapsHtml() : advTab === 'settings' ? advSettingsHtml() : advDataHtml();
+    wireAdv(body);
+  }
+
+  function wireAdv(body) {
+    const on = (sel, ev, fn) => body.querySelectorAll(sel).forEach(el => el.addEventListener(ev, () => fn(el)));
+    // Filtered out
+    on('[data-advshow]', 'click', b => { const o = { ...alwaysShowSet() }; o[normTitle(b.getAttribute('data-advshow'))] = new Date().toISOString(); saveAlwaysShow(o); tagCache.clear(); refreshBoard(); showToast('That title will always show now'); });
+    on('[data-advunshow]', 'click', b => { const o = { ...alwaysShowSet() }; delete o[b.getAttribute('data-advunshow')]; saveAlwaysShow(o); refreshBoard(); });
+    on('[data-advrestore]', 'click', b => { toggleDismiss(b.getAttribute('data-advrestore')); renderAdv(); });
+    // Skill gaps
+    on('[data-advgap]', 'click', b => { intelGapFocus = b.getAttribute('data-advgap'); intelFocus = null; closeAdv(); selectLane(INTEL_ID); setTimeout(() => { const h = document.getElementById('iListHead'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); });
+    on('[data-advhave]', 'click', b => { const o = loadJSON(SKILL_OVERRIDE_KEY, {}); o[b.getAttribute('data-advhave')] = new Date().toISOString(); saveJSON(SKILL_OVERRIDE_KEY, o); refreshBoard(); showToast('Moved to your skills. Add it to your resume too.'); });
+    on('[data-advunhave]', 'click', b => { const o = loadJSON(SKILL_OVERRIDE_KEY, {}); delete o[b.getAttribute('data-advunhave')]; saveJSON(SKILL_OVERRIDE_KEY, o); refreshBoard(); });
+    // Settings
+    const setF = (id, key, parse) => { const el = body.querySelector('#' + id); if (el) el.addEventListener('change', () => { filters[key] = parse(el); persistFilters(); refreshBoard(); }); };
+    const setB = (id, key, parse) => { const el = body.querySelector('#' + id); if (el) el.addEventListener('change', () => { boardSettings[key] = parse(el); saveBoardSettings(); refreshBoard(); renderLeads(); }); };
+    const ck = el => el.checked, num = el => parseInt(el.value, 10) || 0;
+    setF('advHideIrr', 'hideIrrelevant', ck); setF('advHideSenior', 'hideSenior', ck); setF('advGroupDupes', 'groupDuplicates', ck);
+    setF('advShowDismissed', 'showDismissed', ck); setF('advMinFit', 'minFit', num); setF('advMinPay', 'minSalary', num);
+    setB('advHideDegree', 'hideDegree', ck); setB('advHideClear', 'hideClearance', ck);
+    setB('advStripMin', 'stripMin', num); setB('advStripN', 'stripN', num); setB('advStale', 'staleDays', num);
+    setB('advLanding', 'landing', el => el.value);
+    const goal = body.querySelector('#advGoal'); if (goal) goal.addEventListener('change', () => { const p = loadJSON(INTEL_PREFS_KEY, { weeklyGoal: 10, endDate: '' }); p.weeklyGoal = Math.max(1, parseInt(goal.value, 10) || 10); saveJSON(INTEL_PREFS_KEY, p); refreshBoard(); });
+    const end = body.querySelector('#advEnd'); if (end) end.addEventListener('change', () => { const p = loadJSON(INTEL_PREFS_KEY, { weeklyGoal: 10, endDate: '' }); p.endDate = end.value; saveJSON(INTEL_PREFS_KEY, p); refreshBoard(); });
+    const reset = body.querySelector('#advResetSettings'); if (reset) reset.addEventListener('click', () => { boardSettings = { ...BOARD_DEFAULTS }; saveBoardSettings(); filters = { ...FILTER_DEFAULTS }; persistFilters(); refreshBoard(); renderLeads(); showToast('Settings reset to defaults'); });
+    // Data
+    const exp = body.querySelector('#advExport'); if (exp) exp.addEventListener('click', () => {
+      const data = {}; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); data[k] = localStorage.getItem(k); } } catch (e) {}
+      const blob = new Blob([JSON.stringify({ app: 'ops-board', exportedAt: new Date().toISOString(), data }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `ops-board-backup-${new Date().toISOString().slice(0, 10)}.json`; document.body.appendChild(a); a.click(); a.remove();
+      showToast('Backup downloaded');
+    });
+    const imp = body.querySelector('#advImport'); if (imp) imp.addEventListener('change', () => {
+      const f = imp.files && imp.files[0]; if (!f) return;
+      const msg = body.querySelector('#advImportMsg');
+      f.text().then(txt => {
+        const parsed = JSON.parse(txt);
+        if (!parsed || parsed.app !== 'ops-board' || typeof parsed.data !== 'object') throw new Error('That file is not an Ops Board backup.');
+        Object.entries(parsed.data).forEach(([k, v]) => localStorage.setItem(k, v));
+        msg.textContent = `Restored ${Object.keys(parsed.data).length} items from ${parsed.exportedAt.slice(0, 10)}. Reloading…`;
+        setTimeout(() => location.reload(), 900);
+      }).catch(err => { msg.textContent = `Restore failed: ${err.message}`; msg.style.color = 'var(--red)'; });
+    });
+    const csv = body.querySelector('#advLeadsCsv'); if (csv) csv.addEventListener('click', exportLeadsCsv);
+    const cn = body.querySelector('#advClearNew'); if (cn) cn.addEventListener('click', () => { clearNewBadges(); showToast('NEW badges cleared'); });
+    const cs = body.querySelector('#advClearShow'); if (cs) cs.addEventListener('click', () => { saveAlwaysShow({}); refreshBoard(); showToast('Always-show list cleared'); });
+    const ch = body.querySelector('#advClearHave'); if (ch) ch.addEventListener('click', () => { saveJSON(SKILL_OVERRIDE_KEY, {}); refreshBoard(); showToast('Skills moved back to gaps'); });
+  }
+
+  document.getElementById('openAdvBtn').addEventListener('click', () => openAdv());
+  document.getElementById('advCloseBtn').addEventListener('click', closeAdv);
+  document.getElementById('advBackdrop').addEventListener('click', e => { if (e.target.id === 'advBackdrop') closeAdv(); });
+  document.querySelectorAll('.adv-tab').forEach(t => t.addEventListener('click', () => { advTab = t.getAttribute('data-advtab'); renderAdv(); document.getElementById('advBody').scrollTop = 0; }));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('advBackdrop').hidden) closeAdv(); });
+  document.addEventListener('click', e => { const b = e.target.closest('[data-open-adv]'); if (b) openAdv(b.getAttribute('data-open-adv')); });
 
   // ===== Scout Chat =====
   const SCOUT_CHAT_KEY = 'scout-chat-v1';
