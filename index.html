@@ -400,6 +400,80 @@
   .status-Applied { border-color: var(--teal); color: var(--teal); }
   .status-Interview { border-color: var(--amber); color: var(--amber); }
   .status-Rejected { border-color: var(--red); color: var(--red); }
+  .status-Offer { border-color: var(--green); color: var(--green); }
+  /* ===== Niche Intel ===== */
+  .isec { margin: 18px 0; }
+  .isec-h { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--amber); margin-bottom: 10px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+  .isec-sub { color: var(--text-faint); text-transform: none; letter-spacing: 0; }
+  .ikpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .ik { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; min-width: 0; }
+  .ik-v { font-family: var(--mono); font-size: 26px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+  .ik-v small { font-size: 14px; color: var(--text-faint); }
+  .ik-l { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .ik-n { font-size: 11px; color: var(--text-faint); margin-top: 6px; }
+  .ik-n input { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; font-family: var(--mono); font-size: 11px; width: auto; max-width: 130px; }
+  .ik.good { border-color: var(--green); } .ik.good .ik-v { color: var(--green); }
+  .ik.warn { border-color: var(--amber-dim); } .ik.warn .ik-v { color: var(--amber); }
+  .ik.accent .ik-v { color: var(--amber); }
+  .ifunnel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+  .if-s { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; display: flex; gap: 6px; }
+  .if-s b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .if-a { color: var(--text-faint); }
+  .imoves { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--text-dim); font-size: 14px; line-height: 1.5; }
+  .imoves b { color: var(--text); }
+  .incs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .inc { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+  .inc.on { border-color: var(--amber); }
+  .inc-h { font-weight: 600; font-size: 15px; color: var(--text); }
+  .inc-h span { color: var(--amber); }
+  .inc-s { font-size: 12px; color: var(--text-dim); } .inc-s b { color: var(--text); }
+  .inc-t { font-size: 12px; color: var(--teal); }
+  .inc-p { font-size: 12px; color: var(--text-dim); line-height: 1.45; border-left: 2px solid var(--amber-dim); padding-left: 8px; }
+  .inc-pl { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--amber); margin-bottom: 2px; }
+  .inc-c { font-size: 12px; color: var(--text-faint); }
+  .inc .curated-collapse-btn { justify-self: start; }
+  .iheat-wrap { overflow-x: auto; }
+  .iheat { border-collapse: separate; border-spacing: 2px; font-family: var(--mono); font-size: 11px; }
+  .iheat th { color: var(--text-dim); font-weight: 400; text-align: right; padding-right: 6px; white-space: nowrap; }
+  .iheat thead th { height: 96px; vertical-align: bottom; padding: 0 0 6px; }
+  .iheat thead th span { display: inline-block; writing-mode: vertical-rl; transform: rotate(180deg); }
+  .iheat td { width: 40px; height: 32px; padding: 0; }
+  .iheat-c { width: 100%; height: 100%; border: 1px solid var(--line); border-radius: 3px; color: var(--text); font: inherit; cursor: pointer; font-variant-numeric: tabular-nums; }
+  .iheat-c.hi { color: var(--bg); font-weight: 700; }
+  .iheat-c:disabled { cursor: default; color: var(--text-faint); background: transparent !important; }
+  .iheat-c.on, .iheat-c:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+  .iheat-c:not(:disabled):hover { border-color: var(--text); }
+  .iheat-d { text-align: center; color: var(--text-faint); border: 1px dashed var(--line); border-radius: 3px; }
+  .ipost { display: grid; gap: 4px; }
+  .ipost-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 8px 0; }
+  .ipost-l { font-size: 11px; color: var(--text-faint); margin-right: 2px; }
+  .itag { font-family: var(--mono); font-size: 10px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 3px; color: var(--text-dim); }
+  .itag.on { border-color: var(--amber); color: var(--amber); }
+  .itag.lanes { border-color: var(--teal-dim); color: var(--teal); }
+  .igrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0 24px; }
+  .ib { display: grid; grid-template-columns: minmax(110px, 160px) 1fr 28px 96px; align-items: center; gap: 8px; font-size: 12px; margin: 5px 0; }
+  .ib-l { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ib-t { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+  .ib-f { display: block; height: 100%; background: var(--amber); border-radius: 0 4px 4px 0; }
+  .ib-n, .ib-p { font-family: var(--mono); color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+  .ib-p { color: var(--text-faint); }
+  .ichip { font-family: var(--mono); font-size: 10px; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--line); color: var(--text-faint); white-space: nowrap; }
+  .ichip-lapsed { border-color: var(--amber-dim); color: var(--amber); }
+  .ichip-inprogress, .ichip-studied { border-color: var(--teal-dim); color: var(--teal); }
+  .inote { font-size: 12px; color: var(--text-faint); margin-top: 8px; }
+  .itable-wrap { overflow-x: auto; }
+  .itable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .itable th { text-align: left; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); font-weight: 400; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .itable td { padding: 7px 8px; border-bottom: 1px solid var(--line); color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .itable td:first-child { white-space: normal; }
+  .itable tbody tr { cursor: pointer; } .itable tbody tr:hover td { background: var(--panel); }
+  .itable .dim { color: var(--text-faint); }
+  .iemps { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+  .iemp { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: grid; gap: 4px; font-size: 12px; color: var(--text-dim); }
+  .iemp b { color: var(--text); font-size: 13px; } .iemp .itag { justify-self: start; }
+  .ifacts { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+  .ifacts a { color: var(--teal); }
+
   .del-btn {
     font-family: var(--mono); font-size: 9.5px; background: transparent; border: 1px solid var(--line);
     color: var(--text-faint); border-radius: 4px; padding: 3px 7px; cursor: pointer;
@@ -624,7 +698,10 @@
       }).join('')}</div></div>`;
     el.querySelectorAll('[data-tcat]').forEach(b => b.addEventListener('click', () => { targetCat = b.getAttribute('data-tcat'); renderTargets(el); }));
     el.querySelectorAll('[data-tstatus]').forEach(s => s.addEventListener('change', () => {
-      const d = loadTargetStatus(); d[TARGETS[+s.getAttribute('data-tstatus')].n] = s.value; saveTargetStatus(d); renderTargets(el); renderNav();
+      const name = TARGETS[+s.getAttribute('data-tstatus')].n;
+      const d = loadTargetStatus(); d[name] = s.value; saveTargetStatus(d);
+      const t = loadJSON(TARGETS_TOUCHED_KEY, {}); t[name] = new Date().toISOString(); saveJSON(TARGETS_TOUCHED_KEY, t);
+      renderTargets(el); renderNav();
     }));
     el.querySelectorAll('[data-ttrack]').forEach(b => b.addEventListener('click', () => {
       const t = TARGETS[+b.getAttribute('data-ttrack')];
@@ -632,11 +709,352 @@
     }));
   }
 
+  // ===================================================================
+  // ===== Niche Intel — where your lanes overlap, and what matters =====
+  // ===================================================================
+  // Every live posting is tagged against 10 skill clusters built from his
+  // actual experience. A posting hitting 2+ clusters is an "overlap" — the
+  // roles where few candidates match as many requirements as he does. All
+  // numbers below are computed from the live Adzuna pull + his own tracker
+  // data; nothing here is a made-up market statistic.
+  const INTEL_ID = '__intel__';
+  const TARGETS_TOUCHED_KEY = 'targets-touched-v1';
+  const INTEL_PREFS_KEY = 'intel-prefs-v1';
+  function loadJSON(k, d) { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
+  function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+  const CLUSTERS = [
+    { id: 'oph', label: 'Ophthalmic', re: /\b(ophthalm\w*|optometr\w*|optical coherence|oct|retina\w*|visual field|eye ?care|fundus)\b/i,
+      proof: 'Win10→11 upgrades on Zeiss CIRRUS OCT and HFA across six New England states' },
+    { id: 'med', label: 'Medical device', re: /\b(medical (device|equipment)s?|biomedical|bmet|clinical engineer\w*|htm|healthcare technology management|imaging (equipment|systems?)|diagnostic (equipment|instruments?)|fda)\b/i,
+      proof: 'FDA-regulated change control, backup/restore and photo audit trail on clinical instruments' },
+    { id: 'sec', label: 'Security', re: /\b(cyber\w*|security (operations|analyst|engineer|controls?|incidents?)|soc|siem|vulnerabilit\w*|incident response|crowdstrike|sentinel|qualys|threat)\b/i,
+      proof: 'Sentinel, CrowdStrike Falcon and Qualys at BCS365; segmentation checks on clinical devices' },
+    { id: 'net', label: 'Networking', re: /\b(network(ing)? (engineer|admin\w*|infrastructure|support|technician)|cisco|ccna|routing|switch(es|ing)|firewalls?|vlans?|tcp\/ip|lan\/wan|segmentation|fortinet)\b/i,
+      proof: 'Cisco and Extreme OS config, Fortinet firewalls, 8 years NOC troubleshooting' },
+    { id: 'hit', label: 'Healthcare IT', re: /\b(ehr|emr|epic|cerner|pacs|dicom|hl7|clinical (systems|applications)|healthcare it|hospitals?|hipaa)\b/i,
+      proof: 'DICOM/PACS connectivity checks on every Zeiss upgrade; HIPAA environments' },
+    { id: 'fld', label: 'Field service', re: /\b(field (service|engineer|technician|support|based)|travel (required|up to|\d+%|across)|territory|install(ation)?s? (and|&) (service|repair|maintenance))\b/i,
+      proof: 'Six-state field territory, scheduling around clinic hours' },
+    { id: 'noc', label: 'NOC / monitoring', re: /\b(noc|network operations|network monitoring|infrastructure monitoring|solarwinds|24x7|24\/7|uptime)\b/i,
+      proof: '8 years 24x7 NOC on NG911, 99%+ SLA, SolarWinds' },
+    { id: 'cld', label: 'Cloud', re: /\b(azure|aws|cloud|microsoft 365|m365|office 365)\b/i,
+      proof: 'Azure VM right-sizing, AZ-500 background, hands-on AWS' },
+    { id: 'sys', label: 'Systems / endpoint', re: /\b(active directory|windows (server|1[01])|group policy|reimag\w*|(computer|laptop|workstation|pc|system) imaging|sccm|intune|mdt|vmware|esxi|linux|desktop support|end.user)\b/i,
+      proof: 'AD lifecycle and migration, WDS/MDT imaging, VMware, daily Linux' },
+    { id: 'tel', label: '911 / VoIP', re: /\b(911|ng911|e911|psap|voip|telecom\w*|unified communications|cucm|sip)\b/i,
+      proof: '8 years supporting Massachusetts NG911 and VoIP; CUCM provisioning' },
+  ];
+  const CL = Object.fromEntries(CLUSTERS.map(c => [c.id, c]));
+
+  // Certifications employers name, with his honest status for each
+  const CERTS = [
+    { label: 'Security+', re: /\bsecurity\s?\+|sec\+/i, status: 'lapsed' },
+    { label: 'CCNA', re: /\bccna\b/i, status: 'lapsed' },
+    { label: 'Network+', re: /\bnetwork\s?\+/i, status: 'lapsed' },
+    { label: 'A+', re: /\b(comptia )?a\+(?!\w)/i, status: 'lapsed' },
+    { label: 'CySA+', re: /\bcysa\+?/i, status: 'in progress' },
+    { label: 'Azure cert (AZ-xxx)', re: /\baz-\d{3}\b|azure (administrator|security engineer) (associate|certif)/i, status: 'lapsed' },
+    { label: 'AWS certification', re: /\baws certified|aws certification|solutions architect associate/i, status: 'studied' },
+    { label: 'CBET / AAMI', re: /\bcbet\b|\baami\b/i, status: 'none' },
+    { label: 'CISSP', re: /\bcissp\b/i, status: 'none' },
+    { label: 'ITIL', re: /\bitil\b/i, status: 'none' },
+    { label: 'Epic certification', re: /\bepic (certif|certified)/i, status: 'none' },
+  ];
+  // Skills he has, and commonly-requested ones not on his profile
+  const SKILLS_HAVE = [
+    ['Windows 10/11', /\bwindows (10|11)\b/i], ['Active Directory', /\bactive directory\b/i], ['Cisco', /\bcisco\b/i],
+    ['Azure', /\bazure\b/i], ['AWS', /\baws\b/i], ['VMware', /\bvmware|esxi|vsphere\b/i], ['Linux', /\blinux|rhel|ubuntu|centos\b/i],
+    ['Microsoft 365', /\b(microsoft|office) 365|m365\b/i], ['Firewalls', /\bfirewalls?\b/i], ['VoIP', /\bvoip\b/i],
+    ['DICOM / PACS', /\bdicom|pacs\b/i], ['SolarWinds', /\bsolarwinds\b/i], ['CrowdStrike / Sentinel / Qualys', /\bcrowdstrike|sentinel|qualys\b/i],
+    ['Ticketing (Autotask etc.)', /\bautotask|ticketing|connectwise\b/i],
+  ];
+  const SKILLS_GAP = [
+    ['ServiceNow', /\bservicenow\b/i], ['PowerShell / scripting', /\bpowershell|scripting|bash scripting\b/i], ['Python', /\bpython\b/i],
+    ['Intune / SCCM / MECM', /\bintune|sccm|mecm|endpoint manager\b/i], ['Splunk', /\bsplunk\b/i], ['Palo Alto', /\bpalo alto\b/i],
+    ['CMMS (device inventory)', /\bcmms\b/i], ['Epic EHR', /\bepic\b/i], ['Electrical / soldering', /\bschematic|soldering|electrical safety\b/i],
+  ];
+  const BARRIERS = [
+    ['Bachelor\'s required', /\b(bachelor'?s?( degree)? (is )?required|requires a bachelor|must have a bachelor|b\.?s\.? (degree )?required)/i],
+    ['Degree "or equivalent experience"', /\bor equivalent (work )?experience|equivalent combination/i],
+    ['Clearance required', /\b(ts\/sci|top secret|active (security )?clearance|secret clearance)\b/i],
+    ['Driver\'s license / travel', /\bdriver'?s licen[sc]e|travel (required|up to|\d+%)/i],
+  ];
+
+  const tagCache = new Map();
+  function tagJob(j) {
+    const key = j.id + '|' + j.laneId;
+    if (tagCache.has(key)) return tagCache.get(key);
+    const hay = `${j.title || ''} ${j.fullText || j.desc || ''}`;
+    const tags = CLUSTERS.filter(c => c.re.test(hay)).map(c => c.id);
+    tagCache.set(key, tags);
+    return tags;
+  }
+  function median(a) { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+  function pct(n, d) { return d ? Math.round(100 * n / d) : 0; }
+  function money(v) { return v ? '$' + Math.round(v / 1000) + 'K' : '—'; }
+  function companyName(j) { return (j.company || '').split(' — ')[0].trim() || 'Unknown'; }
+  function payOf(j) { return j.rawSalaryMax || j.rawSalaryMin || null; }
+
+  // One record per unique posting, remembering every lane it was found in.
+  function intelJobs() {
+    const byId = new Map();
+    LANES.forEach(l => {
+      const d = liveData[l.id];
+      if (!d || !d.jobs) return;
+      d.jobs.forEach(raw => {
+        const j = normalizeJob(raw, l.id);
+        if (isIrrelevantRole(j.title) || dismissedIds[j.id]) return;
+        if (byId.has(j.id)) { byId.get(j.id).lanes.add(l.id); return; }
+        j.lanes = new Set([l.id]);
+        byId.set(j.id, j);
+      });
+    });
+    const jobs = [...byId.values()];
+    jobs.forEach(j => { j.tags = tagJob(j); j.fit = scoreFit(j); j.nicheScore = j.fit.score + 12 * Math.max(0, j.tags.length - 1) + 8 * (j.lanes.size - 1); });
+    return jobs;
+  }
+
+  let intelFocus = null; // [clusterA, clusterB] selected from the heatmap/niche cards
+
+  function renderIntel(el) {
+    const jobs = intelJobs();
+    const prefs = loadJSON(INTEL_PREFS_KEY, { weeklyGoal: 10, endDate: '' });
+    const anyFetched = Object.keys(liveData).length > 0;
+
+    // ---- pipeline (from the Lead Tracker) ----
+    const weekAgo = Date.now() - 7 * 86400000;
+    const appliedDates = leads.map(l => {
+      const h = (l.history || []).find(x => x.s === 'Applied');
+      if (h) return h.at;
+      return ['Applied', 'Interview', 'Offer', 'Rejected'].includes(l.status) ? (l.lastStatusChange || l.dateAdded) : null;
+    }).filter(Boolean);
+    const appliedThisWeek = appliedDates.filter(d => new Date(d).getTime() >= weekAgo).length;
+    const byStatus = s => leads.filter(l => l.status === s).length;
+    const sentOut = appliedDates.length;
+    const responses = byStatus('Interview') + byStatus('Offer');
+    const touched = loadJSON(TARGETS_TOUCHED_KEY, {});
+    const tStatus = loadTargetStatus();
+    const outreachThisWeek = Object.entries(touched).filter(([n, at]) => new Date(at).getTime() >= weekAgo && ['Contacted', 'Applied', 'Interview'].includes(tStatus[n])).length;
+    const staleLeads = leads.filter(l => { const d = daysSince(l.lastStatusChange || l.dateAdded); return d !== null && d >= STALE_DAYS && ['New', 'Applied'].includes(l.status); }).length;
+    const daysLeft = prefs.endDate ? Math.ceil((new Date(prefs.endDate + 'T23:59:59') - new Date()) / 86400000) : null;
+
+    // ---- market stats ----
+    const overlaps = jobs.filter(j => j.tags.length >= 2);
+    const strong = jobs.filter(j => j.fit.score >= 55);
+    const listedPays = jobs.filter(j => payOf(j) && !j.salaryPredicted).map(payOf);
+    const overlapPays = overlaps.filter(j => payOf(j) && !j.salaryPredicted).map(payOf);
+
+    // pair matrix + niche aggregation
+    const pair = {};
+    overlaps.forEach(j => {
+      for (let a = 0; a < j.tags.length; a++) for (let b = a + 1; b < j.tags.length; b++) {
+        const k = j.tags[a] + '|' + j.tags[b];
+        (pair[k] = pair[k] || []).push(j);
+      }
+    });
+    const clusterCount = Object.fromEntries(CLUSTERS.map(c => [c.id, jobs.filter(j => j.tags.includes(c.id)).length]));
+    const maxPair = Math.max(1, ...Object.values(pair).map(a => a.length));
+    const niches = Object.entries(pair).map(([k, js]) => {
+      const [a, b] = k.split('|');
+      const strongN = js.filter(j => j.fit.score >= 55).length;
+      const pays = js.filter(j => payOf(j) && !j.salaryPredicted).map(payOf);
+      const estPays = js.filter(j => payOf(j)).map(payOf);
+      const cos = {}; js.forEach(j => { const c = companyName(j); cos[c] = (cos[c] || 0) + 1; });
+      const third = {}; js.forEach(j => j.tags.forEach(t => { if (t !== a && t !== b) third[t] = (third[t] || 0) + 1; }));
+      const thirdTop = Object.entries(third).sort((x, y) => y[1] - x[1])[0];
+      const avgFit = js.reduce((s, j) => s + j.fit.score, 0) / js.length;
+      return { a, b, js, n: js.length, strongN, pay: median(pays), payEst: pays.length ? null : median(estPays), avgFit,
+        cos: Object.entries(cos).sort((x, y) => y[1] - x[1]).slice(0, 3).map(x => x[0]),
+        third: thirdTop && thirdTop[1] >= 2 ? thirdTop[0] : null,
+        rank: js.length * (0.4 + avgFit / 100) };
+    }).filter(n => n.n >= 2).sort((x, y) => y.rank - x.rank);
+
+    // credentials, skills, barriers
+    const textOf = j => `${j.title} ${j.fullText || j.desc}`;
+    const certRows = CERTS.map(c => ({ ...c, n: jobs.filter(j => c.re.test(textOf(j))).length })).sort((x, y) => y.n - x.n);
+    const haveRows = SKILLS_HAVE.map(([label, re]) => ({ label, n: jobs.filter(j => re.test(textOf(j))).length })).sort((x, y) => y.n - x.n);
+    const gapRows = SKILLS_GAP.map(([label, re]) => ({ label, n: jobs.filter(j => re.test(textOf(j))).length })).filter(r => r.n).sort((x, y) => y.n - x.n);
+    const barrierRows = BARRIERS.map(([label, re]) => ({ label, n: jobs.filter(j => re.test(textOf(j))).length }));
+    const contractN = jobs.filter(j => j.contractType === 'contract').length;
+    const typedN = jobs.filter(j => j.contractType).length;
+    const freshN = jobs.filter(j => j.created && (Date.now() - new Date(j.created)) < 7 * 86400000).length;
+
+    // employers with several doors in
+    const empMap = {};
+    jobs.forEach(j => { const c = companyName(j); const e = empMap[c] = empMap[c] || { n: 0, lanes: new Set(), best: 0 }; e.n++; j.lanes.forEach(x => e.lanes.add(x)); e.best = Math.max(e.best, j.fit.score); });
+    const targetNames = TARGETS.map(t => t.n.toLowerCase());
+    const multiEmployers = Object.entries(empMap).filter(([c, e]) => c !== 'Unknown' && (e.lanes.size >= 2 || e.n >= 3))
+      .sort((x, y) => (y[1].lanes.size - x[1].lanes.size) || (y[1].n - x[1].n)).slice(0, 10);
+
+    // lane scoreboard
+    const laneRows = LANES.map(l => {
+      const js = jobs.filter(j => j.lanes.has(l.id));
+      const pays = js.filter(j => payOf(j) && !j.salaryPredicted).map(payOf);
+      const cos = {}; js.forEach(j => { const c = companyName(j); cos[c] = (cos[c] || 0) + 1; });
+      const s = js.filter(j => j.fit.score >= 55).length;
+      return { l, n: js.length, strongPct: pct(s, js.length), strongN: s, pay: median(pays), over80: js.filter(j => (payOf(j) || 0) >= 80000).length,
+        fresh: js.filter(j => j.created && (Date.now() - new Date(j.created)) < 7 * 86400000).length,
+        top: Object.entries(cos).sort((x, y) => y[1] - x[1])[0], opp: s * 2 + js.filter(j => j.tags.length >= 2).length };
+    }).sort((x, y) => y.opp - x.opp);
+
+    // ---- today's moves ----
+    const trackedUrls = new Set(leads.map(l => l.url).filter(Boolean));
+    const moves = [];
+    const bestOverlap = overlaps.filter(j => !trackedUrls.has(j.url)).sort((x, y) => y.nicheScore - x.nicheScore)[0];
+    if (bestOverlap) moves.push(`Apply: <b>${escapeHtml(bestOverlap.title)}</b> at ${escapeHtml(companyName(bestOverlap))} — hits ${bestOverlap.tags.map(t => CL[t].label).join(' + ')}. Lead with: ${escapeHtml(CL[bestOverlap.tags[0]].proof)}.`);
+    const nextTarget = TARGETS.filter(t => t.f === 'A' && !tStatus[t.n]).sort((a, b) => 0)[0];
+    if (nextTarget) moves.push(`Reach out: <b>${escapeHtml(nextTarget.n)}</b> — ${escapeHtml(nextTarget.m)}`);
+    if (staleLeads) moves.push(`Follow up on <b>${staleLeads}</b> lead${staleLeads > 1 ? 's' : ''} with no movement in ${STALE_DAYS}+ days. A short check-in email often restarts a stalled application.`);
+    const topLapsed = certRows.find(c => c.status === 'lapsed' && c.n > 0);
+    if (topLapsed) moves.push(`Credential with the most pull right now: <b>${escapeHtml(topLapsed.label)}</b> (named in ${topLapsed.n} live postings). Renewing it unlocks the most filters.`);
+    const goalGap = prefs.weeklyGoal - appliedThisWeek;
+    if (goalGap > 0) moves.push(`<b>${goalGap}</b> more application${goalGap > 1 ? 's' : ''} to hit this week's goal of ${prefs.weeklyGoal}. Pull from the overlap list below first.`);
+
+    // ---- render ----
+    const kpi = (v, label, note, cls = '') => `<div class="ik ${cls}"><div class="ik-v">${v}</div><div class="ik-l">${label}</div>${note ? `<div class="ik-n">${note}</div>` : ''}</div>`;
+    const bar = (label, n, max, extra = '') => `<div class="ib"><span class="ib-l">${escapeHtml(label)}</span><span class="ib-t"><span class="ib-f" style="width:${max && n ? Math.max(2, 100 * n / max) : 0}%"></span></span><span class="ib-n">${n}</span>${extra}</div>`;
+    const statusChip = s => `<span class="ichip ichip-${s.replace(/\s/g, '')}">${s === 'lapsed' ? 'lapsed — renew' : s === 'none' ? 'not held' : s}</span>`;
+
+    const heat = `<div class="iheat-wrap"><table class="iheat" aria-label="Postings that require both skill clusters">
+      <thead><tr><th></th>${CLUSTERS.map(c => `<th><span>${escapeHtml(c.label)}</span></th>`).join('')}</tr></thead>
+      <tbody>${CLUSTERS.map((r, ri) => `<tr><th>${escapeHtml(r.label)}</th>${CLUSTERS.map((c, ci) => {
+        if (ci > ri) return '<td class="iheat-x"></td>';
+        if (ci === ri) return `<td class="iheat-d" title="${escapeAttr(r.label)}: ${clusterCount[r.id]} postings">${clusterCount[r.id]}</td>`;
+        const key = [c.id, r.id].sort((x, y) => CLUSTERS.findIndex(q => q.id === x) - CLUSTERS.findIndex(q => q.id === y)).join('|');
+        const arr = pair[key] || [];
+        const a = arr.length ? 0.12 + 0.88 * arr.length / maxPair : 0;
+        const on = intelFocus && intelFocus.join('|') === key;
+        return `<td><button class="iheat-c ${on ? 'on' : ''} ${a > 0.55 ? 'hi' : ''}" ${arr.length ? `data-ipair="${key}"` : 'disabled'} style="background:rgba(232,163,61,${a.toFixed(2)})" title="${escapeAttr(c.label + ' × ' + r.label)}: ${arr.length} postings, ${arr.filter(j => j.fit.score >= 55).length} strong fit">${arr.length || '·'}</button></td>`;
+      }).join('')}</tr>`).join('')}</tbody></table></div>`;
+
+    const nicheCards = niches.slice(0, 6).map(n => `
+      <div class="inc ${intelFocus && intelFocus.join('|') === n.a + '|' + n.b ? 'on' : ''}">
+        <div class="inc-h">${escapeHtml(CL[n.a].label)} <span>×</span> ${escapeHtml(CL[n.b].label)}</div>
+        <div class="inc-s"><b>${n.n}</b> postings · <b>${n.strongN}</b> strong fit · ${n.pay ? `median <b>${money(n.pay)}</b> listed` : n.payEst ? `~${money(n.payEst)} est.` : 'pay rarely listed'}</div>
+        ${n.third ? `<div class="inc-t">Often also asks for ${escapeHtml(CL[n.third].label)}</div>` : ''}
+        <div class="inc-p"><div class="inc-pl">Lead with</div><div>• ${escapeHtml(CL[n.a].proof)}</div><div>• ${escapeHtml(CL[n.b].proof)}</div></div>
+        <div class="inc-c">Hiring: ${n.cos.map(escapeHtml).join(', ')}</div>
+        <button class="curated-collapse-btn" data-ipair="${n.a}|${n.b}">Show these postings ↓</button>
+      </div>`).join('');
+
+    const list = (intelFocus ? (pair[intelFocus.join('|')] || []) : overlaps).slice().sort((x, y) => y.nicheScore - x.nicheScore).slice(0, 25);
+    const listHtml = list.map(j => {
+      const chips = `<div class="ipost-tags"><span class="ipost-l">Your skills hit:</span>${j.tags.map(t => `<span class="itag ${intelFocus && intelFocus.includes(t) ? 'on' : ''}">${escapeHtml(CL[t].label)}</span>`).join('')}${j.lanes.size > 1 ? `<span class="itag lanes">found in ${j.lanes.size} lanes</span>` : ''}${j.contractType === 'contract' ? '<span class="itag lanes">contract</span>' : ''}</div>`;
+      return postingCardHtml(j, j.laneId, true, true).replace('<div class="posting-actions">', chips + '<div class="posting-actions">');
+    }).join('');
+
+    el.innerHTML = `
+      <div class="lane-header"><div class="lane-header-top"><div>
+        <h1 class="lane-title">Niche Intel</h1>
+        <div class="lane-sub">Where your lanes overlap, what employers ask for, and whether your search is on pace. Computed from ${jobs.length} live postings and your own tracker.</div>
+      </div></div></div>
+
+      <div class="isec">
+        <div class="isec-h">Search momentum</div>
+        <div class="ikpis">
+          ${kpi(`${appliedThisWeek}<small>/${prefs.weeklyGoal}</small>`, 'Applications this week', `<label>Goal <input id="iGoal" type="number" min="1" max="50" value="${prefs.weeklyGoal}"></label>`, appliedThisWeek >= prefs.weeklyGoal ? 'good' : '')}
+          ${kpi(outreachThisWeek, 'Target companies contacted this week', 'From Target Companies statuses')}
+          ${kpi(sentOut ? pct(responses, sentOut) + '%' : '—', 'Response rate', sentOut ? `${responses} interview/offer from ${sentOut} sent${sentOut < 10 ? ' · small sample' : ''}` : 'Mark leads Applied to start measuring')}
+          ${kpi(staleLeads, 'Stale leads', `No movement ${STALE_DAYS}+ days`, staleLeads ? 'warn' : '')}
+          ${kpi(daysLeft !== null ? (daysLeft >= 0 ? daysLeft : 'ended') : '—', 'Days left on Zeiss contract', `<label>End date <input id="iEnd" type="date" value="${escapeAttr(prefs.endDate)}"></label>`, daysLeft !== null && daysLeft <= 30 ? 'warn' : '')}
+        </div>
+        <div class="ifunnel">${['New', 'Applied', 'Interview', 'Offer', 'Rejected'].map(s => `<div class="if-s"><b>${byStatus(s)}</b><span>${s}</span></div>`).join('<span class="if-a">→</span>')}</div>
+      </div>
+
+      ${moves.length ? `<div class="isec"><div class="isec-h">Today's moves</div><ol class="imoves">${moves.map(m => `<li>${m}</li>`).join('')}</ol></div>` : ''}
+
+      ${!anyFetched ? `<div class="pane-empty">Loading live postings… the market sections fill in once Refresh Live finishes.</div>` : `
+      <div class="isec">
+        <div class="isec-h">Market snapshot <span class="isec-sub">this pull · irrelevant and dismissed postings excluded</span></div>
+        <div class="ikpis">
+          ${kpi(jobs.length, 'Unique live postings', `${freshN} posted in the last 7 days`)}
+          ${kpi(overlaps.length, 'Overlap postings', `${pct(overlaps.length, jobs.length)}% hit 2+ of your skill clusters`, 'accent')}
+          ${kpi(strong.length, 'Strong-fit postings', `${pct(strong.length, jobs.length)}% of the market`)}
+          ${kpi(money(median(overlapPays)), 'Median pay, overlap roles', `vs ${money(median(listedPays))} all roles · employer-listed only`)}
+          ${kpi(typedN ? pct(contractN, typedN) + '%' : '—', 'Contract roles', typedN ? `${contractN} of ${typedN} that state a type · C2C candidates` : 'Type not stated')}
+        </div>
+      </div>
+
+      <div class="isec">
+        <div class="isec-h">Your top niches <span class="isec-sub">skill pairs ranked by posting volume × average fit</span></div>
+        ${nicheCards ? `<div class="incs">${nicheCards}</div>` : '<div class="pane-empty">No skill pair has 2+ postings in this pull yet.</div>'}
+      </div>
+
+      <div class="isec">
+        <div class="isec-h">Overlap map <span class="isec-sub">postings requiring both skills · diagonal = total per skill · click a cell to filter</span></div>
+        ${heat}
+      </div>
+
+      <div class="isec">
+        <div class="isec-h">${intelFocus ? `Postings: ${escapeHtml(CL[intelFocus[0]].label)} × ${escapeHtml(CL[intelFocus[1]].label)} <button class="filter-clear" id="iClearFocus">Show all overlaps</button>` : 'Best overlap postings'} <span class="isec-sub">ranked by fit + number of your skills hit</span></div>
+        <div class="pane"><div class="pane-body">${listHtml || '<div class="pane-empty">No overlap postings in this pull.</div>'}</div></div>
+      </div>
+
+      <div class="igrid">
+        <div class="isec">
+          <div class="isec-h">Credentials employers name <span class="isec-sub">postings mentioning each</span></div>
+          ${certRows.map(c => bar(c.label, c.n, certRows[0].n || 1, statusChip(c.status))).join('')}
+        </div>
+        <div class="isec">
+          <div class="isec-h">Barriers in this market</div>
+          ${barrierRows.map(b => bar(b.label, b.n, jobs.length, `<span class="ib-p">${pct(b.n, jobs.length)}%</span>`)).join('')}
+          <div class="inote">"Or equivalent experience" postings are your best bets on degree-gated roles. Your 15 years usually qualifies.</div>
+        </div>
+        <div class="isec">
+          <div class="isec-h">Your skills employers want</div>
+          ${haveRows.slice(0, 10).map(r => bar(r.label, r.n, haveRows[0].n || 1)).join('')}
+        </div>
+        <div class="isec">
+          <div class="isec-h">Asked for, not on your profile</div>
+          ${gapRows.length ? gapRows.map(r => bar(r.label, r.n, gapRows[0].n)).join('') : '<div class="pane-empty">None showing up in this pull.</div>'}
+          <div class="inote">If you've used any of these (PowerShell scripts on upgrades, for example), add them to your resume.</div>
+        </div>
+      </div>
+
+      <div class="isec">
+        <div class="isec-h">Lane scoreboard <span class="isec-sub">ranked by strong-fit and overlap volume</span></div>
+        <div class="itable-wrap"><table class="itable">
+          <thead><tr><th>Lane</th><th>Live</th><th>Strong fit</th><th>Median listed pay</th><th>$80K+</th><th>New ≤7d</th><th>Top employer</th></tr></thead>
+          <tbody>${laneRows.map(r => `<tr data-golane="${r.l.id}"><td>${escapeHtml(r.l.title)}</td><td>${r.n}</td><td>${r.strongN} <span class="dim">(${r.strongPct}%)</span></td><td>${money(r.pay)}</td><td>${r.over80}</td><td>${r.fresh}</td><td>${r.top ? escapeHtml(r.top[0]) : '—'}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+
+      <div class="isec">
+        <div class="isec-h">Employers with several doors in <span class="isec-sub">hiring across 2+ of your lanes or 3+ postings · one contact can cover several roles</span></div>
+        ${multiEmployers.length ? `<div class="iemps">${multiEmployers.map(([c, e]) => `<div class="iemp"><b>${escapeHtml(c)}</b><span>${e.n} postings · ${e.lanes.size} lane${e.lanes.size > 1 ? 's' : ''} · best fit ${e.best}</span>${targetNames.some(t => t.includes(c.toLowerCase().split(' ')[0])) ? '<span class="itag on">on target list</span>' : ''}</div>`).join('')}</div>` : '<div class="pane-empty">No employer is hiring across multiple lanes in this pull.</div>'}
+      </div>`}
+
+      <div class="isec">
+        <div class="isec-h">Why these niches are hiring</div>
+        <ul class="ifacts">
+          <li>Section 524B of the FD&amp;C Act has required cybersecurity documentation for "cyber devices" since March 29, 2023. Device makers and hospitals need people who can patch and verify networked clinical equipment. <a target="_blank" href="https://industrialcyber.co/medical/fda-raises-the-bar-for-cybersecurity-in-medical-devices-requires-premarket-submission-for-cyber-devices/">Source ↗</a></li>
+          <li>Hospital device-security platforms (Asimily, Claroty, Armis, Ordr) are an active, ranked market in 2026, and each needs deployment staff who understand clinical engineering. <a target="_blank" href="https://ordr.net/blog/ordr-vs-claroty">Source ↗</a></li>
+          <li>Windows 10 support ended October 14, 2025, which drove the device-upgrade wave you're on now. That wave is winding down, so move to roles with ongoing work: security, integration, service contracts.</li>
+        </ul>
+      </div>`;
+
+    // ---- wiring ----
+    el.querySelectorAll('[data-ipair]').forEach(b => b.addEventListener('click', () => {
+      intelFocus = b.getAttribute('data-ipair').split('|');
+      renderIntel(el);
+      const h = [...el.querySelectorAll('.isec-h')].find(x => x.textContent.startsWith('Postings:'));
+      if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
+    const clr = document.getElementById('iClearFocus'); if (clr) clr.addEventListener('click', () => { intelFocus = null; renderIntel(el); });
+    const goal = document.getElementById('iGoal'); if (goal) goal.addEventListener('change', () => { prefs.weeklyGoal = Math.max(1, parseInt(goal.value) || 10); saveJSON(INTEL_PREFS_KEY, prefs); renderIntel(el); });
+    const end = document.getElementById('iEnd'); if (end) end.addEventListener('change', () => { prefs.endDate = end.value; saveJSON(INTEL_PREFS_KEY, prefs); renderIntel(el); });
+    el.querySelectorAll('[data-golane]').forEach(r => r.addEventListener('click', () => selectLane(r.getAttribute('data-golane'))));
+    el.querySelectorAll('[data-track]').forEach(btn => btn.addEventListener('click', () => { const p = JSON.parse(btn.getAttribute('data-track')); prefillLead(p.title, p.company, p.url, p.laneId); }));
+    el.querySelectorAll('[data-star-inline]').forEach(btn => btn.addEventListener('click', () => toggleStar(JSON.parse(btn.getAttribute('data-star-inline')))));
+    el.querySelectorAll('[data-dismiss]').forEach(btn => btn.addEventListener('click', () => toggleDismiss(btn.getAttribute('data-dismiss'))));
+  }
+
   let liveData = {};       // laneId -> { jobs, error }
   let starredPostings = {};   // { jobId: {id, title, company, url, meta, laneId, laneTitle} }
   let newPostings = [];       // [{id, title, company, url, meta, laneId, laneTitle, created}]
   let dismissedIds = {};      // { jobId: true } — hidden from all views until un-dismissed
-  let activeLane = LANES[0].id;
+  let activeLane = INTEL_ID; // land on Niche Intel
   let leads = [];
 
   // ===== Filters & sort (applied to live postings across all views) =====
@@ -691,6 +1109,9 @@
       meta: `${formatSalary(j.salaryMin, j.salaryMax)} · via Adzuna`,
       url: j.url,
       desc: j.description ? j.description + '…' : '',
+      fullText: j.text || j.description || '',
+      contractType: j.contractType || null,
+      salaryPredicted: !!j.salaryPredicted,
       created: j.created,
       laneId,
       laneTitle: lane ? lane.title.split(' / ')[0].split(' (')[0] : laneId,
@@ -792,6 +1213,11 @@
     const anyFetched = Object.keys(liveData).length > 0;
 
     const allItem = `
+      <div class="nav-item all-lanes ${activeLane === INTEL_ID ? 'active' : ''}" data-nav="${INTEL_ID}">
+        <span class="nav-num">◆</span>
+        <span class="nav-label">Niche Intel</span>
+        <span class="nav-badges"></span>
+      </div>
       <div class="nav-item all-lanes ${activeLane === ALL_LANES_ID ? 'active' : ''}" data-nav="${ALL_LANES_ID}">
         <span class="nav-num">★</span>
         <span class="nav-label">All Lanes</span>
@@ -904,6 +1330,7 @@
   function renderMain() {
     const el = document.getElementById('mainPane');
     if (activeLane === TARGETS_ID) { renderTargets(el); return; }
+    if (activeLane === INTEL_ID) { renderIntel(el); return; }
     const isAll = activeLane === ALL_LANES_ID;
     const lane = isAll ? null : LANES.find(l => l.id === activeLane);
     const anyFetched = Object.keys(liveData).length > 0;
@@ -1040,13 +1467,16 @@
   const FIT_SIGNALS = [
     { w: 30, label: 'medical device + security', re: /(medical device|biomedical|bmet|clinical engineer|iomt|healthcare technology management)\b[\s\S]{0,80}(security|cyber|vulnerabilit|risk)|(security|cyber)[\s\S]{0,80}(medical device|biomedical|iomt)/i },
     { w: 25, label: 'medical device field service', re: /\b(medical device|biomedical|bmet|imaging equipment|diagnostic equipment|clinical engineer|ophthalmic|oct)\b/i },
+    { w: 22, label: 'ophthalmic / OCT devices', re: /\b(ophthalm\w*|optical coherence|oct|visual field|retina\w*|eye ?care)\b/i },
+    { w: 20, label: 'DICOM / PACS / HL7', re: /\b(dicom|pacs|hl7)\b/i },
+    { w: 14, label: 'NOC operations', re: /\b(noc|network operations( center)?)\b/i },
     { w: 22, label: 'NG911/E911 experience', re: /\b(ng911|e911|next generation 911|psap|emergency communications)\b/i },
     { w: 20, label: 'Sentinel/CrowdStrike/Qualys', re: /\b(microsoft sentinel|azure sentinel|crowdstrike|qualys|nessus|falcon)\b/i },
     { w: 18, label: 'SOC / vulnerability work', re: /\b(soc analyst|security operations|vulnerability (management|assessment|scanning)|incident response|threat detection|siem)\b/i },
     { w: 18, label: 'Azure security & IAM', re: /\b(entra id|azure ad|az-500|conditional access|privileged identity|rbac|key vault|defender for cloud)\b/i },
     { w: 14, label: 'Azure / cloud', re: /\b(azure|microsoft cloud)\b/i },
     { w: 14, label: 'field service engineering', re: /\b(field service|field engineer|on-?site (service|support))\b/i },
-    { w: 12, label: 'network engineering', re: /\b(ccna|routing and switching|ospf|bgp|network engineer|solarwinds|network monitoring)\b/i },
+    { w: 12, label: 'network engineering', re: /\b(ccna|cisco|routing and switching|ospf|bgp|network engineer|solarwinds|network monitoring|fortinet|firewalls?)\b/i },
     { w: 12, label: 'FDA / regulated environment', re: /\b(fda|21 cfr|hipaa|regulated environment|change control|audit trail|joint commission|nist)\b/i },
     { w: 10, label: 'VMware / virtualization', re: /\b(vmware|esxi|vsphere|hyper-?v|virtualization)\b/i },
     { w: 10, label: 'Windows / AD administration', re: /\b(active directory|windows server|group policy|windows 1[01]|sccm|intune)\b/i },
@@ -1095,7 +1525,7 @@
   }
 
   function scoreFit(job) {
-    const haystack = `${job.title || ''} ${job.desc || ''}`;
+    const haystack = `${job.title || ''} ${job.fullText || job.desc || ''}`;
     const hits = [];
     let raw = 0;
     FIT_SIGNALS.forEach(sig => {
@@ -1420,6 +1850,7 @@
             <option value="New" ${lead.status === 'New' ? 'selected' : ''}>New</option>
             <option value="Applied" ${lead.status === 'Applied' ? 'selected' : ''}>Applied</option>
             <option value="Interview" ${lead.status === 'Interview' ? 'selected' : ''}>Interview</option>
+            <option value="Offer" ${lead.status === 'Offer' ? 'selected' : ''}>Offer</option>
             <option value="Rejected" ${lead.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
           </select>
           <button class="del-btn" data-idx="${i}" data-role="del">Remove</button>
@@ -1430,6 +1861,9 @@
       const idx = parseInt(e.target.getAttribute('data-idx'));
       leads[idx].status = e.target.value;
       leads[idx].lastStatusChange = new Date().toISOString();
+      // Dated history so Niche Intel can count applications per week and
+      // measure response rate, not just the current status.
+      (leads[idx].history = leads[idx].history || []).push({ s: e.target.value, at: leads[idx].lastStatusChange });
       await persistLeads(); renderLeads();
     }));
     el.querySelectorAll('[data-role="del"]').forEach(btn => btn.addEventListener('click', async e => {
@@ -1496,7 +1930,7 @@
     if (document.getElementById('scoutBackdrop').classList.contains('open')) return;
     const tag = (document.activeElement.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
-    const navIds = [ALL_LANES_ID, TARGETS_ID, ...LANES.map(l => l.id)];
+    const navIds = [INTEL_ID, ALL_LANES_ID, TARGETS_ID, ...LANES.map(l => l.id)];
     const idx = navIds.indexOf(activeLane);
     if (e.key === 'ArrowDown') { e.preventDefault(); selectLane(navIds[Math.min(idx + 1, navIds.length - 1)]); }
     if (e.key === 'ArrowUp') { e.preventDefault(); selectLane(navIds[Math.max(idx - 1, 0)]); }

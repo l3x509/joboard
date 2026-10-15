@@ -149,6 +149,13 @@ async function fetchOnePhrase(phrase, where) {
       created: j.created,
       url: j.redirect_url,
       description: (j.description || '').slice(0, 280),
+      // Fuller text for skill-cluster tagging and credential/barrier stats on
+      // the Niche Intel view (the card still shows the short description).
+      text: (j.description || '').slice(0, 1500),
+      contractType: j.contract_type || null,   // 'permanent' | 'contract' | null
+      contractTime: j.contract_time || null,   // 'full_time' | 'part_time' | null
+      salaryPredicted: String(j.salary_is_predicted) === '1', // Adzuna estimate, not employer-posted
+      category: (j.category && j.category.label) || null,
     }));
   });
 }
