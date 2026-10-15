@@ -950,6 +950,7 @@
     const barrierRows = BARRIERS.map(([label, re]) => ({ label, n: jobs.filter(j => re.test(textOf(j))).length }));
     const contractN = jobs.filter(j => j.contractType === 'contract').length;
     const typedN = jobs.filter(j => j.contractType).length;
+    const hiddenUnrelated = new Set(LANES.flatMap(l => ((liveData[l.id] || {}).jobs || []).filter(j => isIrrelevantRole(j.title)).map(j => j.id))).size;
     const freshN = jobs.filter(j => j.created && (Date.now() - new Date(j.created)) < 7 * 86400000).length;
 
     // employers with several doors in
@@ -1043,7 +1044,7 @@
       <div class="isec">
         <div class="isec-h">Market snapshot <span class="isec-sub">this pull · irrelevant and dismissed postings excluded</span></div>
         <div class="ikpis">
-          ${kpi(jobs.length, 'Unique live postings', `${freshN} posted in the last 7 days`)}
+          ${kpi(jobs.length, 'Unique live postings', `${freshN} posted in the last 7 days · ${hiddenUnrelated} hidden as unrelated (untick "Hide unrelated jobs" in any lane to review)`)}
           ${kpi(overlaps.length, 'Overlap postings', `${pct(overlaps.length, jobs.length)}% hit 2+ of your skill clusters`, 'accent')}
           ${kpi(strong.length, 'Strong-fit postings', `${pct(strong.length, jobs.length)}% of the market`)}
           ${kpi(money(median(overlapPays)), 'Median pay, overlap roles', `vs ${money(median(listedPays))} all roles · employer-listed only`)}
@@ -1604,42 +1605,36 @@
   // engineer medical device", or a security guard landing in "SOC analyst".
   // Matched against the TITLE only: the description of a legitimate IT job at
   // a logistics or hospital company would trip a description-based check.
-  const EYE_CLINICAL_RES = [
-    /\b(ophthalm\w*|optometr\w*|eye ?care|vision|retina\w*)\s+(assistant|technician|tech|technologist|scribe|medical (technician|technologist|assistant)|photographer|surgical tech\w*)\b/i,
-    /\b(coa|cot|comt|certified ophthalmic|ophthalmic (personnel|medical personnel)|optician|refractionist|ophthalmic scribe|optometric|ophthalmology (assistant|technician|tech))\b/i,
-  ];
-  const IRRELEVANT_TITLE_PATTERNS = [
-    // Driving / delivery — note \bdriver\b alone is unsafe ("device driver")
-    /\b(cdl|truck driver|delivery driver|class [ab] driver|tractor trailer|driver helper|courier|chauffeur|bus driver|forklift)\b/i,
+  // Titles Adzuna's fuzzy matching drags in that aren't his kind of work.
+  // Each rule can carry a `keep` guard: a technical/IT/service word in the
+  // title overrides the rule, so "Windows Server Administrator",
+  // "Information Security Officer" or "Sonography Equipment Field Service
+  // Engineer" are never hidden. Matched against the TITLE only.
+  // Verified with a 125-title test set (relevant + unrelated) on Oct 15, 2026.
+  const TECH_KEEP = /\b(field|service|engineer\w*|equipment|repair|install\w*|biomedical|bmet|htm|it|ict|systems?|network\w*|informatics|analyst|administrator|support|automation|cyber\w*|application specialist|technology|devices?)\b/i;
+  const IRRELEVANT_RULES = [
+    // Driving / delivery — \bdriver\b alone is unsafe ("device driver")
+    { re: /\b(cdl|truck driver|delivery driver|class [ab] driver|tractor trailer|driver helper|courier|chauffeur|bus driver|forklift)\b/i },
     // Hands-on clinical care (comes in via the medical-device lanes)
-    /\b(registered nurse|\brn\b|\blpn\b|\bcna\b|nurse practitioner|medical assistant|phlebotom|caregiver|home health aide|physical therap|occupational therap|respiratory therap|pharmacist|pharmacy tech|dental (hygienist|assistant)|physician|surgeon|radiolog(ist|ic techno)|sonograph|veterinar)\b/i,
+    { re: /\b(registered nurse|rn|lpn|cna|nurse practitioner|medical assistant|phlebotom\w*|caregiver|home health aide|physical therap\w*|occupational therap\w*|respiratory therap\w*|pharmacist|pharmacy tech\w*|dental (hygienist|assistant)|physician|surgeon|radiologist|radiologic technologist|rad tech|sonograph\w*|veterinar\w*)\b/i, keep: TECH_KEEP },
+    // Clinical eye-care roles needing COA/COT/COMT certification he doesn't hold
+    { re: /\b(ophthalm\w*|optometr\w*|eye ?care|vision|retina\w*)\s+(assistant|technician|tech|technologist|scribe|medical (technician|technologist|assistant)|photographer|surgical tech\w*)\b/i, keep: TECH_KEEP },
+    { re: /\b(coa|cot|comt|certified ophthalmic|optician|refractionist|ophthalmic scribe|optometric|ophthalmology (assistant|technician|tech))\b/i, keep: TECH_KEEP },
     // Physical security (comes in via the cybersecurity lane)
-    /\b(security (guard|officer|screener)|loss prevention|armed guard|patrol officer|police officer|corrections officer)\b/i,
-    // Retail / food / general labor
-    /\b(cashier|barista|server|waiter|waitress|line cook|dishwasher|retail associate|sales associate|stocker|warehouse (associate|worker|selector)|janitor|custodian|housekeep|landscap|groundskeep)\b/i,
-    // Clinical eye-care roles that need patient-care certification (COA/COT/COMT)
-    // he doesn't hold. Equipment service / field / IT titles are kept by the
-    // CLINICAL_EYE_KEEP guard in isIrrelevantRole.
-    ...EYE_CLINICAL_RES,
+    { re: /\b(security (guard|officer|screener)|loss prevention|armed guard|patrol officer|police officer|corrections officer)\b/i, keep: /\b(information|cyber\w*|it|data|network|technology|systems)\b/i },
+    // Restaurant / retail / general labor — "server" only in a food context
+    { re: /\b(cashier|barista|(restaurant|banquet|food|cocktail|catering|dining) server|server\s*\/\s*bartender|bartender|waiter|waitress|line cook|dishwasher|retail associate|sales associate|stocker|warehouse (associate|worker|selector)|janitor|custodian|housekeep\w*|landscap\w*|groundskeep\w*)\b/i },
+    { re: /^\s*servers?\s*$/i }, // a bare "Server" title is a restaurant job
     // Trades unrelated to his background
-    /\b(hvac (installer|apprentice)|plumber|electrician apprentice|welder|carpenter|roofer|painter|mason|heavy equipment operator)\b/i,
-    // Sales/marketing (he's stated a preference against outbound sales)
-    /\b(outside sales|door.to.door|insurance agent|real estate agent|leasing (agent|consultant)|telemarketer|recruiter)\b/i,
-    // Other clearly-unrelated professional roles
-    /\b(teacher|substitute teacher|paralegal|accountant|bookkeeper|social worker|childcare|preschool)\b/i,
+    { re: /\b(hvac (installer|apprentice)|plumber|electrician apprentice|welder|carpenter|roofer|painter|mason|heavy equipment operator)\b/i },
+    // Sales / recruiting (he's stated a preference against outbound sales)
+    { re: /\b(outside sales|door.to.door|insurance agent|real estate agent|leasing (agent|consultant)|telemarketer|recruiter)\b/i },
+    // Other clearly unrelated professions
+    { re: /\b(teacher|substitute teacher|paralegal|accountant|bookkeeper|social worker|childcare|preschool)\b/i, keep: /\b(it|technology|systems)\b/i },
   ];
-
-  // Ophthalmic titles that ARE his work (equipment service, field, IT) —
-  // never dropped by the clinical eye-care patterns above.
-  const CLINICAL_EYE_KEEP = /\b(service|field|engineer|equipment|repair|installation|biomedical|IT|systems?|network|support specialist|application specialist)\b/i;
   function isIrrelevantRole(title) {
     const t = title || '';
-    return IRRELEVANT_TITLE_PATTERNS.some(re => {
-      if (!re.test(t)) return false;
-      // The two clinical eye-care patterns yield to service/field/IT titles
-      if (EYE_CLINICAL_RES.includes(re) && CLINICAL_EYE_KEEP.test(t)) return false;
-      return true;
-    });
+    return IRRELEVANT_RULES.some(r => r.re.test(t) && !(r.keep && r.keep.test(t)));
   }
 
   function scoreFit(job) {

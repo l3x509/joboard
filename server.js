@@ -101,6 +101,7 @@ const LANES = {
   // lane, so it stays link-only in the dashboard (see snapshot-note there).
 };
 
+const LANE_CAP = 60; // was 20 — relevant postings past #20 were silently dropped
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours — keeps Adzuna calls low on the free tier
 
 // In-memory cache: { [lane]: { fetchedAt, jobs: [...] } }
@@ -128,7 +129,7 @@ async function fetchOnePhrase(phrase, where) {
   url.searchParams.set('app_key', APP_KEY);
   url.searchParams.set('what', phrase);
   url.searchParams.set('where', where);
-  url.searchParams.set('results_per_page', '20');
+  url.searchParams.set('results_per_page', '50'); // Adzuna max per request — same API cost as 20
   url.searchParams.set('sort_by', 'date');
   url.searchParams.set('content-type', 'application/json');
 
@@ -163,7 +164,7 @@ async function fetchOnePhrase(phrase, where) {
 // Adzuna's `what` param does a plain keyword/phrase match — it has no
 // boolean OR support, so a lane with multiple alternative search phrases
 // (e.g. "NOC engineer" vs "network operations") needs one real request per
-// phrase. Results are merged and deduped by posting id, then capped at 20.
+// phrase. Results are merged and deduped by posting id, then capped at LANE_CAP.
 async function fetchLaneFromAdzuna(laneKey) {
   const lane = LANES[laneKey];
   if (!lane) throw new Error(`Unknown lane: ${laneKey}`);
@@ -184,7 +185,7 @@ async function fetchLaneFromAdzuna(laneKey) {
     }
   }
   merged.sort((a, b) => new Date(b.created) - new Date(a.created));
-  return merged.slice(0, 20);
+  return merged.slice(0, LANE_CAP);
 }
 
 async function getLane(laneKey, forceRefresh = false) {
