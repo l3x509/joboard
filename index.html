@@ -266,6 +266,15 @@
   .fit-badge.strong { color: var(--green); border: 1px solid var(--green); background: rgba(110,201,127,.08); }
   .fit-badge.moderate { color: var(--amber); border: 1px solid var(--amber-dim); background: rgba(232,163,61,.07); }
   .fit-badge.weak { color: var(--text-faint); border: 1px solid var(--line); }
+  .rel { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+  .rel-t { width: 64px; height: 6px; border-radius: 3px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; flex: none; }
+  .rel-f { display: block; height: 100%; border-radius: 0 3px 3px 0; }
+  .rel b { font-size: 13px; font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
+  .rel-l { color: var(--text-dim); }
+  .rel.strong .rel-f { background: var(--green); } .rel.strong b { color: var(--green); }
+  .rel.moderate .rel-f { background: var(--amber); } .rel.moderate b { color: var(--amber); }
+  .rel.weak .rel-f { background: var(--text-faint); } .rel.weak b { color: var(--text-faint); }
+  .curated-card-rel { margin-top: 6px; }
   .fit-why {
     font-family: var(--mono); font-size: 10px; color: var(--text-dim); line-height: 1.45;
   }
@@ -805,12 +814,14 @@
       d.jobs.forEach(raw => {
         const j = normalizeJob(raw, l.id);
         if (isIrrelevantRole(j.title) || dismissedIds[j.id]) return;
-        if (byId.has(j.id)) { byId.get(j.id).lanes.add(l.id); return; }
+        const k = dedupeKey(j);
+        const hit = byId.get('id:' + j.id) || byId.get(k);
+        if (hit) { hit.lanes.add(l.id); return; }
         j.lanes = new Set([l.id]);
-        byId.set(j.id, j);
+        byId.set('id:' + j.id, j); byId.set(k, j);
       });
     });
-    const jobs = [...byId.values()];
+    const jobs = [...new Set(byId.values())];
     jobs.forEach(j => { j.tags = tagJob(j); j.fit = scoreFit(j); j.nicheScore = j.fit.score + 12 * Math.max(0, j.tags.length - 1) + 8 * (j.lanes.size - 1); });
     return jobs;
   }
@@ -1655,6 +1666,15 @@
     return `Posted ${Math.round(days / 30)} mo ago`;
   }
 
+  // 0–100 relevance meter: same score as the fit badge, shown as a bar so
+  // relevance reads at a glance. Number + label carry meaning, not color alone.
+  function relevanceMeter(score, label, title) {
+    const cls = score >= 55 ? 'strong' : score >= 22 ? 'moderate' : 'weak';
+    return `<span class="rel ${cls}" title="${escapeAttr(title || `Relevance ${score}/100`)}" aria-label="Relevance ${score} out of 100">
+      <span class="rel-t"><span class="rel-f" style="width:${Math.max(score, 2)}%"></span></span>
+      <b>${score}</b>${label ? `<span class="rel-l">${escapeHtml(label)}</span>` : ''}</span>`;
+  }
+
   function postingCardHtml(p, laneId, isLive, showLaneTag) {
     const trackPayload = escapeAttr(JSON.stringify({ title: p.title, company: p.company, url: p.url, laneId }));
     const isStarred = p.id && starredPostings[p.id];
@@ -1663,7 +1683,7 @@
     const freshness = isLive && p.created ? postedAgoLabel(p.created) : '';
     const starPayload = p.id ? escapeAttr(JSON.stringify({
       id: p.id, title: p.title, company: p.company, url: p.url, meta: p.meta,
-      laneId, laneTitle: p.laneTitle || laneId,
+      laneId, laneTitle: p.laneTitle || laneId, fit: fit.score,
     })) : '';
     return `
       <div class="posting-card ${isDismissed ? 'dismissed' : ''}">
@@ -1676,9 +1696,7 @@
               ${p.dupeCount > 1 ? `<span class="dupe-badge" title="This employer posted ${p.dupeCount} near-identical listings">×${p.dupeCount}</span>` : ''}
             </div>
             <div class="fit-line">
-              <span class="fit-badge ${fit.cls}" title="Confidence ${fit.score}/100 — based on keyword overlap with your documented skills">
-                ${escapeHtml(fit.level)} · ${fit.score}
-              </span>
+              ${relevanceMeter(fit.score, fit.level, `Relevance ${fit.score}/100 — keyword overlap with your documented skills`)}
               <span class="fit-why">${escapeHtml(fit.why)}</span>
             </div>
             <div class="posting-company">${escapeHtml(p.company)}</div>
@@ -1726,9 +1744,10 @@
   }
   document.getElementById('fetchLiveBtn').addEventListener('click', fetchLivePostings);
   loadFilterState();
-  loadWeekState();
-  renderWeekStrip();
-  fetchLivePostings();
+  // Deferred one tick: the This Week storage keys are declared further down
+  // this script, so calling loadWeekState() here hit them before they existed
+  // and starred postings silently loaded as empty on every page load.
+  setTimeout(() => { loadWeekState(); renderWeekStrip(); fetchLivePostings(); }, 0);
 
   // ===== Action bar =====
   const PRIMARY_SEARCHES = [
@@ -1982,6 +2001,7 @@
 
     const freshlyNew = [];
     const allIdsThisFetch = [];
+    const keysThisFetch = new Set(); // same posting fetched by several lanes, or reposted by an agency
 
     Object.entries(allLaneResults).forEach(([laneId, jobs]) => {
       const lane = LANES.find(l => l.id === laneId);
@@ -1989,7 +2009,12 @@
         if (!j.id) return;
         allIdsThisFetch.push(j.id);
         if (!seenSet.has(j.id) && !dismissedIds[j.id]) {
+          const norm = normalizeJob(j, laneId);
+          const k = dedupeKey(norm);
+          if (keysThisFetch.has(k) || isIrrelevantRole(j.title)) return;
+          keysThisFetch.add(k);
           freshlyNew.push({
+            fit: scoreFit(norm).score,
             id: j.id, title: j.title,
             company: `${j.company || 'Unknown company'} — ${j.location || ''}`,
             url: j.url,
@@ -2013,6 +2038,15 @@
     try { localStorage.setItem(SEEN_IDS_KEY, JSON.stringify(mergedIds)); } catch (e) {}
   }
 
+  // Relevance for a This Week card: stored score if captured with one,
+  // else rescore from the live pull (full text), else from the title alone.
+  function weekRelevance(c) {
+    if (typeof c.fit === 'number') return c.fit;
+    const lane = liveData[c.laneId];
+    const live = lane && lane.jobs && lane.jobs.find(j => String(j.id) === String(c.id));
+    return scoreFit(live ? normalizeJob(live, c.laneId) : { title: c.title, desc: '' }).score;
+  }
+
   function clearNewBadges() {
     newPostings = [];
     persistNewPostings();
@@ -2025,13 +2059,24 @@
     const newIds = new Set(newPostings.map(p => p.id));
     const starredIds = new Set(starredList.map(p => p.id));
     // Merge, starred first, no duplicates if something is both starred and new
-    const combined = [
+    const raw = [
       ...starredList.map(p => ({ ...p, _starred: true, _new: newIds.has(p.id) })),
       ...newPostings.filter(p => !starredIds.has(p.id)).map(p => ({ ...p, _starred: false, _new: true })),
     ];
+    // No duplicates: one card per posting id AND per company + title
+    // signature (agency reposts and cross-lane hits). Starred copies win.
+    const seenKeys = new Set();
+    const combined = [];
+    raw.forEach(c => {
+      const k = dedupeKey(c);
+      if (seenKeys.has('id:' + c.id) || seenKeys.has(k)) return;
+      seenKeys.add('id:' + c.id); seenKeys.add(k);
+      combined.push({ ...c, _fit: weekRelevance(c) });
+    });
+    combined.sort((a, b) => (b._starred - a._starred) || (b._fit - a._fit));
 
     sub.textContent = combined.length
-      ? `${starredList.length} starred · ${newPostings.length} new since last visit · click a card to jump to that lane`
+      ? `${combined.filter(c => c._starred).length} starred · ${combined.filter(c => !c._starred).length} new since last visit · sorted by relevance · click a card to jump to that lane`
       : 'Star a posting from any lane, or check back after refreshing live results';
 
     const el = document.getElementById('curatedCards');
@@ -2054,6 +2099,7 @@
         <div class="curated-card-title">${escapeHtml(c.title)}</div>
         <div class="curated-card-company">${escapeHtml(c.company)}</div>
         <div class="curated-card-meta">${escapeHtml(c.meta)}</div>
+        <div class="curated-card-rel">${relevanceMeter(c._fit, '/100', `Relevance ${c._fit}/100 to your background`)}</div>
       </div>`).join('');
 
     el.querySelectorAll('[data-jump]').forEach(card => {
