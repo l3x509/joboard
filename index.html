@@ -275,6 +275,10 @@
   .rel.moderate .rel-f { background: var(--amber); } .rel.moderate b { color: var(--amber); }
   .rel.weak .rel-f { background: var(--text-faint); } .rel.weak b { color: var(--text-faint); }
   .curated-card-rel { margin-top: 6px; }
+  .curated-card-why { margin-top: 4px; font-size: 11px; color: var(--text-faint); line-height: 1.4; }
+  .curated-card-link { display: inline-block; margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--amber); text-decoration: none; }
+  .curated-card-link:hover { text-decoration: underline; }
+  .strip-view.on { border-color: var(--amber); color: var(--amber); }
   .fit-why {
     font-family: var(--mono); font-size: 10px; color: var(--text-dim); line-height: 1.45;
   }
@@ -554,9 +558,11 @@
   <div class="curated-strip">
     <div class="curated-strip-head">
       <div>
-        <div class="curated-strip-title"><span class="amber-dot"></span>This Week<span class="curated-strip-sub" id="curatedSub">Star a posting from any lane, or check back after refreshing live results</span></div>
+        <div class="curated-strip-title"><span class="amber-dot"></span><span id="stripTitle">Top Fit Opportunities</span><span class="curated-strip-sub" id="curatedSub">Star a posting from any lane, or check back after refreshing live results</span></div>
       </div>
       <div style="display:flex; gap:8px; align-items:center;">
+        <button class="curated-collapse-btn strip-view on" data-strip="top">Top fit</button>
+        <button class="curated-collapse-btn strip-view" data-strip="starred" id="stripStarredBtn">★ Starred</button>
         <button class="curated-collapse-btn" id="curatedToggleBtn">– Collapse</button>
         <button class="curated-collapse-btn" id="clearNewBtn" style="display:none;">Clear NEW badges</button>
       </div>
@@ -1184,6 +1190,7 @@
     persistDismissed();
     renderNav();
     renderMain();
+    renderWeekStrip();
   }
 
   // Normalizes a raw Adzuna job into the shape the card renderer expects,
@@ -2137,70 +2144,79 @@
     renderWeekStrip();
   }
 
+  // Top strip: the highest-rated fit opportunities in the live pull
+  // (deduped, irrelevant and dismissed excluded), or the starred list.
+  const STRIP_TOP_N = 12;
+  let stripView = 'top';
   function renderWeekStrip() {
     const sub = document.getElementById('curatedSub');
-    const starredList = Object.values(starredPostings);
-    const newIds = new Set(newPostings.map(p => p.id));
-    const starredIds = new Set(starredList.map(p => p.id));
-    // Merge, starred first, no duplicates if something is both starred and new
-    const raw = [
-      ...starredList.map(p => ({ ...p, _starred: true, _new: newIds.has(p.id) })),
-      ...newPostings.filter(p => !starredIds.has(p.id)).map(p => ({ ...p, _starred: false, _new: true })),
-    ];
-    // No duplicates: one card per posting id AND per company + title
-    // signature (agency reposts and cross-lane hits). Starred copies win.
-    const seenKeys = new Set();
-    const combined = [];
-    raw.forEach(c => {
-      const k = dedupeKey(c);
-      if (seenKeys.has('id:' + c.id) || seenKeys.has(k)) return;
-      seenKeys.add('id:' + c.id); seenKeys.add(k);
-      combined.push({ ...c, _fit: weekRelevance(c) });
-    });
-    combined.sort((a, b) => (b._starred - a._starred) || (b._fit - a._fit));
-
-    sub.textContent = combined.length
-      ? `${combined.filter(c => c._starred).length} starred · ${combined.filter(c => !c._starred).length} new since last visit · sorted by relevance · click a card to jump to that lane`
-      : 'Star a posting from any lane, or check back after refreshing live results';
-
     const el = document.getElementById('curatedCards');
-    if (!combined.length) {
-      el.innerHTML = `<div class="pane-empty" style="padding:14px 4px;">Nothing here yet — star a posting from any lane's Live results, or click "Refresh Live" to check for new ones.</div>`;
-      document.getElementById('clearNewBtn').style.display = 'none';
+    const newIds = new Set(newPostings.map(p => String(p.id)));
+    const starredList = Object.values(starredPostings);
+    document.getElementById('stripTitle').textContent = stripView === 'top' ? 'Top Fit Opportunities' : 'Starred';
+    document.getElementById('stripStarredBtn').textContent = `★ Starred (${starredList.length})`;
+    document.querySelectorAll('.strip-view').forEach(b => b.classList.toggle('on', b.getAttribute('data-strip') === stripView));
+
+    let cards;
+    if (stripView === 'top') {
+      const anyFetched = Object.keys(liveData).length > 0;
+      const ranked = intelJobs()
+        .filter(j => j.fit.score >= 22)
+        .sort((x, y) => (y.fit.score - x.fit.score) || (y.tags.length - x.tags.length) || (new Date(y.created || 0) - new Date(x.created || 0)))
+        .slice(0, STRIP_TOP_N);
+      cards = ranked.map(j => ({
+        id: j.id, title: j.title, company: j.company, url: j.url, laneId: j.laneId, laneTitle: j.laneTitle,
+        meta: `${formatSalary(j.rawSalaryMin, j.rawSalaryMax)}${j.created ? ' · ' + postedAgoLabel(j.created) : ''}`,
+        why: j.fit.hits.slice(0, 2).join(', '), blockers: j.fit.blockers,
+        _fit: j.fit.score, _new: newIds.has(String(j.id)), _starred: !!starredPostings[j.id], _lanes: j.lanes.size,
+      }));
+      sub.textContent = !anyFetched ? 'Loading live postings…'
+        : cards.length ? `Your ${cards.length} best-matching live postings, ranked by fit (22+ only, duplicates removed) · click a card to open its lane`
+        : 'No live posting scores 22+ right now — check back after the next refresh';
+    } else {
+      cards = starredList.map(p => ({ ...p, _fit: weekRelevance(p), _new: newIds.has(String(p.id)), _starred: true }))
+        .sort((x, y) => y._fit - x._fit);
+      sub.textContent = cards.length ? `${cards.length} starred posting${cards.length > 1 ? 's' : ''}, ranked by fit` : 'Star a posting from any card to keep it here';
+    }
+
+    document.getElementById('clearNewBtn').style.display = 'none';
+    if (!cards.length) {
+      el.innerHTML = `<div class="pane-empty" style="padding:14px 4px;">${stripView === 'top' ? 'No posting scores 22+ yet. Click "Refresh Live" to pull new ones.' : 'Nothing starred yet.'}</div>`;
       return;
     }
-    document.getElementById('clearNewBtn').style.display = newPostings.length ? 'inline-block' : 'none';
 
-    el.innerHTML = combined.map(c => `
+    el.innerHTML = cards.map((c, i) => `
       <div class="curated-card" data-jump="${c.laneId}">
         <div class="curated-card-top">
-          <span class="curated-lane-tag">${escapeHtml(c.laneTitle)}</span>
+          <span class="curated-lane-tag">${stripView === 'top' ? `#${i + 1} · ` : ''}${escapeHtml(c.laneTitle || '')}</span>
           <span style="display:flex; gap:6px; align-items:center;">
             ${c._new ? '<span class="curated-age" style="color:var(--teal);">NEW</span>' : ''}
-            <button class="star-btn ${c._starred ? 'on' : ''}" data-star="${escapeAttr(c.id)}" title="${c._starred ? 'Unstar' : 'Star'}">★</button>
+            <button class="star-btn ${c._starred ? 'on' : ''}" data-star="${escapeAttr(String(c.id))}" title="${c._starred ? 'Unstar' : 'Star'}">★</button>
           </span>
         </div>
         <div class="curated-card-title">${escapeHtml(c.title)}</div>
         <div class="curated-card-company">${escapeHtml(c.company)}</div>
-        <div class="curated-card-meta">${escapeHtml(c.meta)}</div>
+        <div class="curated-card-meta">${escapeHtml(c.meta || '')}</div>
         <div class="curated-card-rel">${relevanceMeter(c._fit, '/100', `Relevance ${c._fit}/100 to your background`)}</div>
+        ${c.why ? `<div class="curated-card-why">${escapeHtml(c.why)}${c._lanes > 1 ? ` · fits ${c._lanes} lanes` : ''}${c.blockers && c.blockers.length ? ` · <span style="color:var(--amber)">watch: ${escapeHtml(c.blockers[0])}</span>` : ''}</div>` : ''}
+        ${c.url ? `<a class="curated-card-link" target="_blank" href="${escapeAttr(c.url)}">View & Apply ↗</a>` : ''}
       </div>`).join('');
 
     el.querySelectorAll('[data-jump]').forEach(card => {
       card.addEventListener('click', (e) => {
-        if (e.target.closest('[data-star]')) return; // star click shouldn't also navigate
+        if (e.target.closest('[data-star]') || e.target.closest('a')) return;
         selectLane(card.getAttribute('data-jump'));
       });
     });
     el.querySelectorAll('[data-star]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const id = btn.getAttribute('data-star');
-        const item = combined.find(c => c.id === id);
-        if (item) toggleStar(item);
+        const item = cards.find(c => String(c.id) === btn.getAttribute('data-star'));
+        if (item) toggleStar({ id: item.id, title: item.title, company: item.company, url: item.url, meta: item.meta, laneId: item.laneId, laneTitle: item.laneTitle, fit: item._fit });
       });
     });
   }
+  document.querySelectorAll('.strip-view').forEach(b => b.addEventListener('click', () => { stripView = b.getAttribute('data-strip'); renderWeekStrip(); }));
 
   document.getElementById('curatedToggleBtn').addEventListener('click', (e) => {
     const cards = document.getElementById('curatedCards');
