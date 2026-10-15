@@ -470,6 +470,24 @@
   .ichip-lapsed { border-color: var(--amber-dim); color: var(--amber); }
   .ichip-inprogress, .ichip-studied { border-color: var(--teal-dim); color: var(--teal); }
   .inote { font-size: 12px; color: var(--text-faint); margin-top: 8px; }
+  .igaps { display: grid; border-top: 1px solid var(--line); }
+  .igap { display: grid; grid-template-columns: minmax(150px, 1.1fr) 130px 80px minmax(200px, 2.4fr) auto; gap: 12px; align-items: center; padding: 10px 6px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--text-dim); }
+  .igap.on { background: var(--panel); }
+  .igap-head { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); padding-top: 6px; padding-bottom: 6px; }
+  .igap-n { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; min-width: 0; }
+  .igap-n b { color: var(--text); font-size: 13px; }
+  .igap-n small { flex-basis: 100%; color: var(--text-faint); }
+  .igap-c { display: grid; grid-template-columns: 1fr 22px 30px; gap: 6px; align-items: center; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .igap-c b, .igap-g b { color: var(--text); text-align: right; } .igap-c small, .igap-g small { color: var(--text-faint); }
+  .igap-g { font-family: var(--mono); display: flex; gap: 4px; align-items: baseline; font-variant-numeric: tabular-nums; }
+  .igap-t { line-height: 1.45; min-width: 0; }
+  .igap-a { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+  @media (max-width: 900px) {
+    .igap { grid-template-columns: 1fr 1fr; }
+    .igap-head { display: none; }
+    .igap-t, .igap-a { grid-column: 1 / -1; }
+    .igap-a { flex-direction: row; }
+  }
   .itable-wrap { overflow-x: auto; }
   .itable { width: 100%; border-collapse: collapse; font-size: 13px; }
   .itable th { text-align: left; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); font-weight: 400; padding: 6px 8px; border-bottom: 1px solid var(--line); }
@@ -784,14 +802,32 @@
     ['MFA / SSO / IAM', /\bmfa|multi-?factor|sso|single sign-?on|identity and access\b/i],
     ['Imaging (WDS/MDT)', /\bwds|mdt|reimag\w*|clonezilla\b/i],
   ];
-  // Confirmed gaps or never-mentioned skills employers ask for
-  const SKILLS_GAP = [
-    ['Python', /\bpython\b/i], ['Wireless / WLAN', /\b(wireless|wlan|wi-?fi|meraki|aruba)\b/i],
-    ['Intune / SCCM / MECM', /\bintune|sccm|mecm|endpoint manager\b/i], ['Splunk', /\bsplunk\b/i], ['Palo Alto', /\bpalo alto\b/i],
-    ['CMMS (device inventory)', /\bcmms\b/i], ['Epic EHR', /\bepic\b/i], ['Electrical / soldering', /\bschematic|soldering|electrical safety\b/i],
-    ['Team management', /\b(manage|supervise|lead) a team|people management|direct reports\b/i],
-    ['Terraform / Kubernetes', /\bterraform|kubernetes|k8s\b/i],
+  // Skills employers ask for that are NOT in his confirmed inventory, each
+  // with a concrete way to close it. 'confirmed' = he told us he lacks it.
+  const GAP_CATALOG = [
+    { label: 'Python / scripting automation', re: /\bpython\b/i, confirmed: true, close: 'Free: "Automate the Boring Stuff with Python." Start by scripting a task you already do, like parsing device logs or renaming upgrade photos.' },
+    { label: 'Wireless / WLAN', re: /\b(wireless|wlan|wi-?fi|meraki|aruba|access points?)\b/i, confirmed: true, close: 'Network+ covers the basics; CWNA is the vendor-neutral depth cert. A home lab with one managed access point gives you something real to talk about.' },
+    { label: 'Team management', re: /\b(manage|supervise|lead) (a |the )?team|people management|direct reports|team lead\b/i, confirmed: true, close: 'Reframe what you have: mentoring junior NOC staff, supervising site expansion at Bed Bath & Beyond, coordinating OEMs and field techs.' },
+    { label: 'Bachelor\'s degree', re: /\b(bachelor'?s?( degree)? (is )?required|requires a bachelor|must have a bachelor)/i, confirmed: true, close: 'Target "or equivalent experience" postings first. WGU-style competency degrees can credit your past certs if you decide to finish one.' },
+    { label: 'Intune / SCCM / MECM', re: /\bintune|sccm|mecm|endpoint manager|configuration manager\b/i, close: 'Free Microsoft Learn paths for Endpoint Administrator (MD-102). Your WDS/MDT imaging is the same job done the older way; say so.' },
+    { label: 'HL7 / interfaces', re: /\bhl7|interface engine|mirth|rhapsody\b/i, close: 'Pairs naturally with your DICOM/PACS work. Free HL7 v2 primers plus the open-source Mirth Connect engine make a weekend lab.' },
+    { label: 'Epic / EHR certification', re: /\bepic\b|cerner|oracle health|meditech/i, close: 'Epic certification is employer-sponsored only. Apply to hospital IT roles that say they will train.' },
+    { label: 'CMMS / asset management', re: /\bcmms|asset management system|nuvolo|accruent|tms\b/i, close: 'Learned on the job. Point to your device tracker and per-device audit trail as the same discipline.' },
+    { label: 'CBET / electrical repair', re: /\bcbet\b|schematics?|soldering|electrical safety test|component.level/i, close: 'AAMI\'s CBET needs documented biomed experience; a BMET certificate program shortens the path. Your Zeiss component replacement counts toward it.' },
+    { label: 'Splunk', re: /\bsplunk\b/i, close: 'Splunk offers free fundamentals training. Your Sentinel/KQL experience transfers; queries and dashboards work the same way.' },
+    { label: 'Palo Alto Networks', re: /\bpalo alto|pan-?os|prisma\b/i, close: 'Palo Alto\'s free Beacon training. Your Fortinet firewall work is the closest proof; name it beside any Palo Alto requirement.' },
+    { label: 'Terraform / Kubernetes / Docker', re: /\bterraform|kubernetes|k8s|docker|containers?\b/i, close: 'HashiCorp Terraform Associate is the usual first step. You already deploy apps on Railway, which runs containers behind the scenes.' },
+    { label: 'Ansible / config automation', re: /\bansible|puppet|chef\b/i, close: 'Free Ansible docs and a lab of two Linux VMs. Pairs with Python.' },
+    { label: 'SQL / databases', re: /\bsql\b|database administration|t-sql/i, close: 'You have run SQL in Supabase/PostgreSQL for your own products. A short free SQL course turns that into something you can claim confidently.' },
+    { label: 'Okta / Entra SSO admin', re: /\bokta|ping identity|saml\b/i, close: 'Your AZ-500 identity background (Entra ID, Conditional Access) covers the concepts; Okta has free admin training.' },
+    { label: 'Jamf / Apple management', re: /\bjamf|mdm\b/i, close: 'Jamf offers free intro courses. You support macOS already.' },
+    { label: 'ITIL certification', re: /\bitil\b/i, close: 'ITIL 4 Foundation is a one-exam cert. Your years in ServiceNow, Remedy and Autotask are ITIL practice already.' },
+    { label: 'SD-WAN', re: /\bsd-?wan|velocloud|viptela\b/i, close: 'Vendor free training (Cisco, Fortinet SD-WAN). Builds on your Cisco and Fortinet background.' },
+    { label: 'Fluent Spanish', re: /\bspanish\b/i, close: 'You have basic Spanish. Only apply where it says "preferred," not "required."' },
+    { label: 'Security clearance', re: /\b(ts\/sci|top secret|active (security )?clearance|secret clearance)\b/i, close: 'Can\'t self-obtain; employers sponsor it. Skip "active clearance required" postings.' },
   ];
+  const SKILL_OVERRIDE_KEY = 'skills-override-v1'; // gaps he marks "I have this"
+  let intelGapFocus = null;
   const BARRIERS = [
     ['Bachelor\'s required', /\b(bachelor'?s?( degree)? (is )?required|requires a bachelor|must have a bachelor|b\.?s\.? (degree )?required)/i],
     ['Degree "or equivalent experience"', /\bor equivalent (work )?experience|equivalent combination/i],
@@ -894,7 +930,17 @@
     const textOf = j => `${j.title} ${j.fullText || j.desc}`;
     const certRows = CERTS.map(c => ({ ...c, n: jobs.filter(j => c.re.test(textOf(j))).length })).sort((x, y) => y.n - x.n);
     const haveRows = SKILLS_HAVE.map(([label, re]) => ({ label, n: jobs.filter(j => re.test(textOf(j))).length })).sort((x, y) => y.n - x.n);
-    const gapRows = SKILLS_GAP.map(([label, re]) => ({ label, n: jobs.filter(j => re.test(textOf(j))).length })).filter(r => r.n).sort((x, y) => y.n - x.n);
+    const haveOverrides = loadJSON(SKILL_OVERRIDE_KEY, {});
+    const good = jobs.filter(j => j.fit.score >= 22);
+    const gapRows = GAP_CATALOG.filter(g => !haveOverrides[g.label]).map(g => {
+      const hits = jobs.filter(j => g.re.test(textOf(j)));
+      const goodHits = hits.filter(j => j.fit.score >= 22);
+      const laneN = {}; hits.forEach(j => j.lanes.forEach(l => { laneN[l] = (laneN[l] || 0) + 1; }));
+      return { ...g, hits, n: hits.length, goodN: goodHits.length,
+        lanes: Object.entries(laneN).sort((x, y) => y[1] - x[1]).slice(0, 2).map(x => laneLabel(x[0])),
+        impact: goodHits.length * 2 + hits.length };
+    }).filter(g => g.n).sort((x, y) => y.impact - x.impact);
+    const maxGap = gapRows.length ? gapRows[0].n : 1;
     const barrierRows = BARRIERS.map(([label, re]) => ({ label, n: jobs.filter(j => re.test(textOf(j))).length }));
     const contractN = jobs.filter(j => j.contractType === 'contract').length;
     const typedN = jobs.filter(j => j.contractType).length;
@@ -926,6 +972,8 @@
     const nextTarget = TARGETS.filter(t => t.f === 'A' && !tStatus[t.n]).sort((a, b) => 0)[0];
     if (nextTarget) moves.push(`Reach out: <b>${escapeHtml(nextTarget.n)}</b> — ${escapeHtml(nextTarget.m)}`);
     if (staleLeads) moves.push(`Follow up on <b>${staleLeads}</b> lead${staleLeads > 1 ? 's' : ''} with no movement in ${STALE_DAYS}+ days. A short check-in email often restarts a stalled application.`);
+    const topGap = gapRows.find(g => g.goodN > 0 && !g.confirmed) || gapRows.find(g => g.goodN > 0);
+    if (topGap) moves.push(`Biggest skill gap in your best matches: <b>${escapeHtml(topGap.label)}</b> (in ${topGap.goodN} of ${good.length} possible/strong-fit postings). ${escapeHtml(topGap.close)}`);
     const topLapsed = certRows.find(c => c.status === 'lapsed' && c.n > 0);
     if (topLapsed) moves.push(`Credential with the most pull right now: <b>${escapeHtml(topLapsed.label)}</b> (named in ${topLapsed.n} live postings). Renewing it unlocks the most filters.`);
     const goalGap = prefs.weeklyGoal - appliedThisWeek;
@@ -958,7 +1006,8 @@
         <button class="curated-collapse-btn" data-ipair="${n.a}|${n.b}">Show these postings ↓</button>
       </div>`).join('');
 
-    const list = (intelFocus ? (pair[intelFocus.join('|')] || []) : overlaps).slice().sort((x, y) => y.nicheScore - x.nicheScore).slice(0, 25);
+    const gapFocusRow = intelGapFocus && gapRows.find(g => g.label === intelGapFocus);
+    const list = (gapFocusRow ? gapFocusRow.hits : intelFocus ? (pair[intelFocus.join('|')] || []) : overlaps).slice().sort((x, y) => y.nicheScore - x.nicheScore).slice(0, 25);
     const listHtml = list.map(j => {
       const chips = `<div class="ipost-tags"><span class="ipost-l">Your skills hit:</span>${j.tags.map(t => `<span class="itag ${intelFocus && intelFocus.includes(t) ? 'on' : ''}">${escapeHtml(CL[t].label)}</span>`).join('')}${j.lanes.size > 1 ? `<span class="itag lanes">found in ${j.lanes.size} lanes</span>` : ''}${j.contractType === 'contract' ? '<span class="itag lanes">contract</span>' : ''}</div>`;
       return postingCardHtml(j, j.laneId, true, true).replace('<div class="posting-actions">', chips + '<div class="posting-actions">');
@@ -1007,7 +1056,7 @@
       </div>
 
       <div class="isec">
-        <div class="isec-h">${intelFocus ? `Postings: ${escapeHtml(CL[intelFocus[0]].label)} × ${escapeHtml(CL[intelFocus[1]].label)} <button class="filter-clear" id="iClearFocus">Show all overlaps</button>` : 'Best overlap postings'} <span class="isec-sub">ranked by fit + number of your skills hit</span></div>
+        <div class="isec-h" id="iListHead">${gapFocusRow ? `Postings asking for: ${escapeHtml(gapFocusRow.label)} <button class="filter-clear" id="iClearFocus">Show all overlaps</button>` : intelFocus ? `Postings: ${escapeHtml(CL[intelFocus[0]].label)} × ${escapeHtml(CL[intelFocus[1]].label)} <button class="filter-clear" id="iClearFocus">Show all overlaps</button>` : 'Best overlap postings'} <span class="isec-sub">ranked by fit + number of your skills hit</span></div>
         <div class="pane"><div class="pane-body">${listHtml || '<div class="pane-empty">No overlap postings in this pull.</div>'}</div></div>
       </div>
 
@@ -1025,11 +1074,21 @@
           <div class="isec-h">Your skills employers want</div>
           ${haveRows.slice(0, 10).map(r => bar(r.label, r.n, haveRows[0].n || 1)).join('')}
         </div>
-        <div class="isec">
-          <div class="isec-h">Asked for, not on your profile</div>
-          ${gapRows.length ? gapRows.map(r => bar(r.label, r.n, gapRows[0].n)).join('') : '<div class="pane-empty">None showing up in this pull.</div>'}
-          <div class="inote">Python and wireless are your confirmed gaps. If any other item here is something you've actually used, tell Scout and add it to your resume.</div>
-        </div>
+      </div>
+
+      <div class="isec">
+        <div class="isec-h">Skill gaps across your market <span class="isec-sub">skills employers ask for that aren't on your profile · ranked by how often they appear in jobs you fit</span></div>
+        ${gapRows.length ? `<div class="igaps">
+          <div class="igap igap-head"><span>Skill</span><span>Postings</span><span>In your fit jobs</span><span>How to close it</span><span></span></div>
+          ${gapRows.map(g => `<div class="igap ${intelGapFocus === g.label ? 'on' : ''}">
+            <span class="igap-n"><b>${escapeHtml(g.label)}</b>${g.confirmed ? '<span class="ichip ichip-lapsed">confirmed gap</span>' : ''}<small>${g.lanes.map(escapeHtml).join(' · ')}</small></span>
+            <span class="igap-c"><span class="ib-t"><span class="ib-f" style="width:${Math.max(4, 100 * g.n / maxGap)}%"></span></span><b>${g.n}</b><small>${pct(g.n, jobs.length)}%</small></span>
+            <span class="igap-g"><b>${g.goodN}</b><small>of ${good.length}</small></span>
+            <span class="igap-t">${escapeHtml(g.close)}</span>
+            <span class="igap-a"><button class="curated-collapse-btn" data-igap="${escapeAttr(g.label)}">Postings ↑</button>${g.confirmed ? '' : `<button class="curated-collapse-btn" data-ihave="${escapeAttr(g.label)}" title="Move this to skills you have">I have this</button>`}</span>
+          </div>`).join('')}
+        </div>` : '<div class="pane-empty">No gaps showing up in this pull.</div>'}
+        ${Object.keys(haveOverrides).length ? `<div class="inote">Marked as yours: ${Object.keys(haveOverrides).map(escapeHtml).join(', ')} · <button class="filter-clear" id="iResetHave">Undo</button> · Add these to your resume and tell Scout.</div>` : ''}
       </div>
 
       <div class="isec">
@@ -1056,12 +1115,22 @@
 
     // ---- wiring ----
     el.querySelectorAll('[data-ipair]').forEach(b => b.addEventListener('click', () => {
-      intelFocus = b.getAttribute('data-ipair').split('|');
+      intelFocus = b.getAttribute('data-ipair').split('|'); intelGapFocus = null;
       renderIntel(el);
       const h = [...el.querySelectorAll('.isec-h')].find(x => x.textContent.startsWith('Postings:'));
       if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }));
-    const clr = document.getElementById('iClearFocus'); if (clr) clr.addEventListener('click', () => { intelFocus = null; renderIntel(el); });
+    const clr = document.getElementById('iClearFocus'); if (clr) clr.addEventListener('click', () => { intelFocus = null; intelGapFocus = null; renderIntel(el); });
+    el.querySelectorAll('[data-igap]').forEach(b => b.addEventListener('click', () => {
+      intelGapFocus = b.getAttribute('data-igap'); intelFocus = null; renderIntel(el);
+      const h = document.getElementById('iListHead'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
+    el.querySelectorAll('[data-ihave]').forEach(b => b.addEventListener('click', () => {
+      const o = loadJSON(SKILL_OVERRIDE_KEY, {}); o[b.getAttribute('data-ihave')] = new Date().toISOString(); saveJSON(SKILL_OVERRIDE_KEY, o);
+      if (intelGapFocus === b.getAttribute('data-ihave')) intelGapFocus = null;
+      renderIntel(el); showToast('Moved to your skills. Add it to your resume too.');
+    }));
+    const rh = document.getElementById('iResetHave'); if (rh) rh.addEventListener('click', () => { saveJSON(SKILL_OVERRIDE_KEY, {}); renderIntel(el); });
     const goal = document.getElementById('iGoal'); if (goal) goal.addEventListener('change', () => { prefs.weeklyGoal = Math.max(1, parseInt(goal.value) || 10); saveJSON(INTEL_PREFS_KEY, prefs); renderIntel(el); });
     const end = document.getElementById('iEnd'); if (end) end.addEventListener('change', () => { prefs.endDate = end.value; saveJSON(INTEL_PREFS_KEY, prefs); renderIntel(el); });
     el.querySelectorAll('[data-golane]').forEach(r => r.addEventListener('click', () => selectLane(r.getAttribute('data-golane'))));
