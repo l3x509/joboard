@@ -17,6 +17,7 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
+const sources = require('./sources'); // The Muse + company job boards (Greenhouse/Lever/Ashby/SmartRecruiters)
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -157,6 +158,7 @@ async function fetchOnePhrase(phrase, where) {
       contractTime: j.contract_time || null,   // 'full_time' | 'part_time' | null
       salaryPredicted: String(j.salary_is_predicted) === '1', // Adzuna estimate, not employer-posted
       category: (j.category && j.category.label) || null,
+      source: 'Adzuna',
     }));
   });
 }
@@ -236,10 +238,46 @@ app.get('/api/jobs/all', async (req, res) => {
         }
       })
     );
-    res.json(Object.fromEntries(results));
+    const out = Object.fromEntries(results);
+    // Merge The Muse + company boards into the same lanes. A failure here
+    // never breaks the Adzuna results.
+    try {
+      const extra = await sources.getExtraSources(forceRefresh);
+      Object.entries(extra.lanes).forEach(([lane, jobs]) => {
+        if (!out[lane]) return; // client-only lanes (e.g. UN/NGO) have no server key
+        const ids = new Set((out[lane].jobs || []).map(j => j.id));
+        const add = jobs.filter(j => !ids.has(j.id));
+        out[lane] = { ...out[lane], jobs: [...(out[lane].jobs || []), ...add], extraCount: add.length };
+      });
+    } catch (e) {
+      console.error('Extra sources failed:', e.message);
+    }
+    res.json(out);
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
+});
+
+// What each extra source returned, which company boards were found, errors.
+app.get('/api/sources/status', (req, res) => res.json(sources.sourcesStatus()));
+
+// Find a company's public job board: /api/ats/discover?name=Outset Medical
+app.get('/api/ats/discover', async (req, res) => {
+  const name = String(req.query.name || '').trim();
+  if (name.length < 2) return res.status(400).json({ error: 'name required' });
+  try { res.json({ name, hits: await sources.discoverCompany(name) }); }
+  catch (e) { res.status(502).json({ error: e.message }); }
+});
+
+// Fetch boards the user added in the dashboard: { boards: [{company, ats, slug}] }
+app.post('/api/ats/jobs', async (req, res) => {
+  const boards = (Array.isArray(req.body.boards) ? req.body.boards : [])
+    .filter(b => b && sources.ATS[b.ats] && /^[\w.-]{2,80}$/.test(b.slug || '')).slice(0, 25);
+  try {
+    const { jobs, perBoard } = await sources.fetchBoards(boards);
+    const { lanes, unmatched } = sources.byLane(jobs);
+    res.json({ lanes, perBoard, unmatched });
+  } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
 // Scout — a single endpoint that handles both freeform career-advice chat

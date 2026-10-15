@@ -647,6 +647,7 @@
     <div class="adv-tabs" role="tablist">
       <button role="tab" class="adv-tab" data-advtab="filtered">Filtered out</button>
       <button role="tab" class="adv-tab" data-advtab="gaps">Skill gaps</button>
+      <button role="tab" class="adv-tab" data-advtab="sources">Sources</button>
       <button role="tab" class="adv-tab" data-advtab="settings">Settings</button>
       <button role="tab" class="adv-tab" data-advtab="data">Data</button>
     </div>
@@ -897,6 +898,9 @@
     { label: 'Security clearance', re: /\b(ts\/sci|top secret|active (security )?clearance|secret clearance)\b/i, close: 'Can\'t self-obtain; employers sponsor it. Skip "active clearance required" postings.' },
   ];
   const SKILL_OVERRIDE_KEY = 'skills-override-v1'; // gaps he marks "I have this"
+  const CUSTOM_BOARDS_KEY = 'custom-boards-v1';   // [{company, ats, slug}] added in ☰ Advanced → Sources
+  const HIDDEN_SOURCES_KEY = 'hidden-sources-v1'; // { "Company (Greenhouse)": true }
+  let lastCustomStatus = [];
   let intelGapFocus = null;
   const BARRIERS = [
     ['Bachelor\'s required', /\b(bachelor'?s?( degree)? (is )?required|requires a bachelor|must have a bachelor|b\.?s\.? (degree )?required)/i],
@@ -1259,7 +1263,8 @@
       rawSalaryMin: j.salaryMin, rawSalaryMax: j.salaryMax,
       title: j.title,
       company: `${j.company || 'Unknown company'} — ${j.location || ''}`,
-      meta: `${formatSalary(j.salaryMin, j.salaryMax)} · via Adzuna`,
+      meta: `${formatSalary(j.salaryMin, j.salaryMax)} · via ${j.source || 'Adzuna'}`,
+      source: j.source || 'Adzuna',
       url: j.url,
       desc: j.description ? j.description + '…' : '',
       fullText: j.text || j.description || '',
@@ -1496,10 +1501,10 @@
     let liveHtml;
     if (!anyFetched) {
       liveHtml = `<div class="pane-empty">Not fetched yet — click "Refresh Live" above.</div>`;
-    } else if (!isAll && liveData[lane.id] && liveData[lane.id].error) {
+    } else if (!isAll && liveData[lane.id] && liveData[lane.id].error && !(liveData[lane.id].jobs || []).length) {
       liveHtml = `<div class="live-error">Live fetch failed: ${escapeHtml(liveData[lane.id].error)}</div>`;
     } else if (!totalJobs) {
-      liveHtml = `<div class="pane-empty">No live results from Adzuna${isAll ? '' : ' for this lane'} right now.</div>`;
+      liveHtml = `<div class="pane-empty">No live results${isAll ? '' : ' for this lane'} right now.</div>`;
     } else if (!shown.length) {
       liveHtml = `<div class="pane-empty">All ${totalJobs} posting${totalJobs > 1 ? 's' : ''} filtered out — loosen the filters above.</div>`;
     } else {
@@ -1538,7 +1543,7 @@
       ${filterBarHtml(shown.length, totalJobs, irrelevantCountForLane(activeLane))}
       <div class="pane-row">
         <div class="pane">
-          <div class="pane-head"><span class="pane-head-label live">Live — Adzuna</span></div>
+          <div class="pane-head"><span class="pane-head-label live">Live — Adzuna · The Muse · company boards</span></div>
           <div class="pane-body" id="livePaneBody">${liveHtml}</div>
         </div>
       </div>
@@ -1899,7 +1904,8 @@
     const other = Math.max(0, unique - shown - unrelated - dismissed);
     setApiStatus(`✓ Live — ${lastFetchedTotal} fetched · ${unique} unique · ${shown} shown`, true);
     const el = document.getElementById('apiStatus');
-    el.title = `${lastFetchedTotal} postings returned by Adzuna across all lanes\n` +
+    const bySrc = {}; all.forEach(j => { const k = /\((Greenhouse|Lever|Ashby|SmartRecruiters)\)$/.test(j.source || '') ? 'Company boards' : (j.source || 'Adzuna'); bySrc[k] = (bySrc[k] || 0) + 1; });
+    el.title = `${lastFetchedTotal} postings fetched across all lanes (${Object.entries(bySrc).map(([k, v]) => `${k} ${v}`).join(', ')})\n` +
       `− ${lastFetchedTotal - unique} duplicates (same job found by several lanes, or agency reposts)\n` +
       `= ${unique} unique postings\n` +
       `− ${unrelated} hidden as unrelated\n` +
@@ -1921,10 +1927,28 @@
       const res = await fetch('/api/jobs/all');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      // Company boards you added yourself in ☰ Advanced → Sources
+      const custom = loadJSON(CUSTOM_BOARDS_KEY, []);
+      if (custom.length) {
+        try {
+          const cr = await fetch('/api/ats/jobs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ boards: custom }) });
+          if (cr.ok) {
+            const cj = await cr.json();
+            Object.entries(cj.lanes || {}).forEach(([lane, jobs]) => {
+              if (!data[lane]) return;
+              const ids = new Set((data[lane].jobs || []).map(j => j.id));
+              data[lane].jobs = [...(data[lane].jobs || []), ...jobs.filter(j => !ids.has(j.id))];
+            });
+            lastCustomStatus = cj.perBoard || [];
+          }
+        } catch (e) { /* custom boards are optional */ }
+      }
+      const hiddenSources = loadJSON(HIDDEN_SOURCES_KEY, {});
       let total = 0;
       const jobsByLane = {};
       Object.entries(data).forEach(([laneKey, laneResult]) => {
-        liveData[laneKey] = laneResult.error ? { error: laneResult.error } : { jobs: laneResult.jobs };
+        laneResult.jobs = (laneResult.jobs || []).filter(j => !hiddenSources[j.source]);
+        liveData[laneKey] = { jobs: laneResult.jobs, error: laneResult.error || null };
         jobsByLane[laneKey] = laneResult.jobs || [];
         total += (laneResult.jobs || []).length;
       });
@@ -2214,7 +2238,8 @@
             id: j.id, title: j.title,
             company: `${j.company || 'Unknown company'} — ${j.location || ''}`,
             url: j.url,
-            meta: `${formatSalary(j.salaryMin, j.salaryMax)} · via Adzuna`,
+            meta: `${formatSalary(j.salaryMin, j.salaryMax)} · via ${j.source || 'Adzuna'}`,
+      source: j.source || 'Adzuna',
             laneId, laneTitle: lane ? lane.title.split(' / ')[0].split(' (')[0] : laneId,
             created: j.created,
           });
@@ -2455,9 +2480,95 @@
       </div>`;
   }
 
+  // ---- ☰ Advanced → Sources ----
+  const ATS_LABEL = { greenhouse: 'Greenhouse', lever: 'Lever', ashby: 'Ashby', smartrecruiters: 'SmartRecruiters' };
+  function sourceCountsFromLive() {
+    const c = {}; const seen = new Set();
+    LANES.forEach(l => ((liveData[l.id] || {}).jobs || []).forEach(j => { if (seen.has(j.id)) return; seen.add(j.id); const s = j.source || 'Adzuna'; c[s] = (c[s] || 0) + 1; }));
+    return c;
+  }
+  async function renderAdvSources(body) {
+    body.innerHTML = '<div class="adv-empty">Loading source status…</div>';
+    let st = null;
+    try { const r = await fetch('/api/sources/status'); if (r.ok) st = await r.json(); } catch (e) {}
+    if (advTab !== 'sources') return;
+    const live = sourceCountsFromLive();
+    const hidden = loadJSON(HIDDEN_SOURCES_KEY, {});
+    const custom = loadJSON(CUSTOM_BOARDS_KEY, []);
+    const boardRow = (b, removable) => {
+      const src = `${b.company} (${ATS_LABEL[b.ats]})`;
+      const isHidden = !!hidden[src];
+      const counts = b.error ? `<span style="color:var(--red)">error: ${escapeHtml(b.error)}</span>`
+        : typeof b.total === 'number' ? `${b.kept} of ${b.total} postings kept (New England / remote-US)`
+        : typeof b.n === 'number' ? `${b.n} postings on board` : 'Not fetched yet';
+      return `<div class="adv-row"><div><b>${escapeHtml(b.company)}</b><span class="adv-reason">${ATS_LABEL[b.ats]} · ${escapeHtml(b.slug)}</span>${isHidden ? '<span class="adv-reason">hidden</span>' : ''}
+        <small>${counts}${live[src] ? ` · ${live[src]} in your lanes now` : ''}${b.sample && b.sample.length ? ` · e.g. ${b.sample.map(escapeHtml).join(', ')}` : ''}</small></div>
+        <div class="adv-actions"><button class="curated-collapse-btn" data-advhidesrc="${escapeAttr(src)}">${isHidden ? 'Show again' : 'Hide'}</button>${removable ? `<button class="curated-collapse-btn" data-advrmboard="${escapeAttr(b.ats + ':' + b.slug)}">Remove</button>` : ''}</div></div>`;
+    };
+    const perBoard = st ? st.boards : [];
+    const statusFor = b => ({ ...b, ...(perBoard.find(p => p.ats === b.ats && p.slug === b.slug) || lastCustomStatus.find(p => p.ats === b.ats && p.slug === b.slug) || {}), company: b.company });
+    const autoBoards = st ? [...st.verified, ...st.discovery.found.filter(f => !st.verified.some(v => v.ats === f.ats && v.slug === f.slug))] : [];
+    const disc = st ? st.discovery : null;
+    body.innerHTML = `
+      <div class="adv-sec"><h3>Where your postings come from</h3>
+        <p class="adv-note">Every source is deduplicated, sorted into your lanes by job title, fit-scored and filtered the same way. LinkedIn and Indeed have no public job API — use the Indeed/LinkedIn links in each lane and ⚡ Check All Boards for those.</p>
+        <div class="adv-row"><div><b>Adzuna</b><small>Aggregates company career sites and job boards · searched per lane</small></div><div class="adv-actions"><b>${live['Adzuna'] || 0}</b></div></div>
+        <div class="adv-row"><div><b>The Muse</b><small>${st && st.muse.fetchedAt ? `Checked ${new Date(st.muse.fetchedAt).toLocaleString()} · ${st.muse.total} New England / remote postings in the last 60 days, ${st.muse.unmatched} matched none of your lanes` : 'Not fetched yet'}${st && st.muse.error ? ` · <span style="color:var(--red)">error: ${escapeHtml(st.muse.error)}</span>` : ''}</small></div><div class="adv-actions"><b>${live['The Muse'] || 0}</b></div></div>
+        ${!st ? '<p class="adv-note" style="color:var(--red)">Could not reach the server for source status.</p>' : ''}
+      </div>
+      <div class="adv-sec"><h3>Company job boards (${autoBoards.length})</h3>
+        <p class="adv-note">Read straight from each company's public Greenhouse, Lever, Ashby or SmartRecruiters board. The server re-checks ${disc ? disc.checked : 'your target'} companies daily${disc && disc.ranAt ? ` (last run ${new Date(disc.ranAt).toLocaleString()})` : disc && disc.running ? ' — first run in progress, check back in a few minutes' : ''}. Companies on Workday, iCIMS or SuccessFactors (most large device makers) can't be read this way.</p>
+        ${autoBoards.length ? autoBoards.map(b => boardRow(statusFor(b), false)).join('') : '<div class="adv-empty">No boards found yet.</div>'}
+      </div>
+      <div class="adv-sec"><h3>Add a company</h3>
+        <p class="adv-note">Type a company name. The server looks for its public board on all four systems.</p>
+        <div class="adv-btns"><input id="advFindName" placeholder="e.g. Outset Medical" aria-label="Company name" style="flex:1;min-width:180px;background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:inherit;font-size:13px">
+        <button class="curated-collapse-btn" id="advFindBtn">Find board</button></div>
+        <div id="advFindResult" style="margin-top:8px"></div>
+      </div>
+      <div class="adv-sec"><h3>Companies you added (${custom.length})</h3>
+        ${custom.length ? custom.map(b => boardRow(statusFor(b), true)).join('') : '<div class="adv-empty">None yet.</div>'}
+      </div>`;
+    wireAdvSources(body);
+  }
+  function wireAdvSources(body) {
+    body.querySelectorAll('[data-advhidesrc]').forEach(b => b.addEventListener('click', () => {
+      const h = loadJSON(HIDDEN_SOURCES_KEY, {}); const k = b.getAttribute('data-advhidesrc');
+      if (h[k]) delete h[k]; else h[k] = true; saveJSON(HIDDEN_SOURCES_KEY, h);
+      showToast('Applied — refreshing live postings'); fetchLivePostings().then(() => renderAdv());
+    }));
+    body.querySelectorAll('[data-advrmboard]').forEach(b => b.addEventListener('click', () => {
+      const [ats, slug] = b.getAttribute('data-advrmboard').split(':');
+      saveJSON(CUSTOM_BOARDS_KEY, loadJSON(CUSTOM_BOARDS_KEY, []).filter(x => !(x.ats === ats && x.slug === slug)));
+      fetchLivePostings().then(() => renderAdv());
+    }));
+    const btn = body.querySelector('#advFindBtn'), inp = body.querySelector('#advFindName'), out = body.querySelector('#advFindResult');
+    const find = async () => {
+      const name = inp.value.trim(); if (name.length < 2) return;
+      out.innerHTML = `<div class="adv-empty">Checking Greenhouse, Lever, Ashby and SmartRecruiters for "${escapeHtml(name)}"… this can take up to a minute.</div>`;
+      try {
+        const r = await fetch('/api/ats/discover?name=' + encodeURIComponent(name));
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'lookup failed');
+        out.innerHTML = d.hits.length ? d.hits.map((h, i) => `<div class="adv-row"><div><b>${escapeHtml(name)}</b><span class="adv-reason">${ATS_LABEL[h.ats]} · ${escapeHtml(h.slug)}</span><small>${h.n} postings · e.g. ${h.sample.map(escapeHtml).join(', ')}</small></div><div class="adv-actions"><button class="curated-collapse-btn" data-advaddboard="${i}">Add</button></div></div>`).join('')
+          : `<div class="adv-empty">No public board found for "${escapeHtml(name)}". It probably uses Workday, iCIMS or another system without a public API — track it under Target Companies instead.</div>`;
+        out.querySelectorAll('[data-advaddboard]').forEach(b => b.addEventListener('click', () => {
+          const h = d.hits[+b.getAttribute('data-advaddboard')];
+          const list = loadJSON(CUSTOM_BOARDS_KEY, []);
+          if (!list.some(x => x.ats === h.ats && x.slug === h.slug)) list.push({ company: name, ats: h.ats, slug: h.slug });
+          saveJSON(CUSTOM_BOARDS_KEY, list);
+          showToast(`Added ${name} — pulling its postings`); fetchLivePostings().then(() => renderAdv());
+        }));
+      } catch (e) { out.innerHTML = `<div class="adv-empty" style="color:var(--red)">Lookup failed: ${escapeHtml(e.message)}</div>`; }
+    };
+    if (btn) btn.addEventListener('click', find);
+    if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') find(); });
+  }
+
   function renderAdv() {
     document.querySelectorAll('.adv-tab').forEach(t => t.setAttribute('aria-selected', t.getAttribute('data-advtab') === advTab ? 'true' : 'false'));
     const body = document.getElementById('advBody');
+    if (advTab === 'sources') { renderAdvSources(body); return; }
     body.innerHTML = advTab === 'filtered' ? advFilteredHtml() : advTab === 'gaps' ? advGapsHtml() : advTab === 'settings' ? advSettingsHtml() : advDataHtml();
     wireAdv(body);
   }
