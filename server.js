@@ -17,7 +17,8 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
-const sources = require('./sources'); // The Muse + company job boards (Greenhouse/Lever/Ashby/SmartRecruiters)
+const sources = require('./sources');
+const niche = require('./niche'); // Business Niche finder (Scout research + HN/Reddit/YouTube signals) // The Muse + company job boards (Greenhouse/Lever/Ashby/SmartRecruiters)
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -312,7 +313,7 @@ You operate in two modes depending on what's asked:
 let cachedPostings = null; // { items, refreshedAt } — in-memory, cleared on server restart
 const POSTINGS_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
-async function callScout(messages, maxTokens, maxSearches) {
+async function callScout(messages, maxTokens, maxSearches, system = SCOUT_SYSTEM_PROMPT) {
   const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -323,7 +324,7 @@ async function callScout(messages, maxTokens, maxSearches) {
     body: JSON.stringify({
       model: 'claude-sonnet-5',
       max_tokens: maxTokens,
-      system: SCOUT_SYSTEM_PROMPT,
+      system,
       messages,
       tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxSearches }],
     }),
@@ -380,6 +381,24 @@ app.post('/api/scout', async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
+});
+
+// ===== Business Niches =====
+// Scout research costs a few cents per run (web search + generation); cached 12h per focus.
+app.post('/api/niche/discover', async (req, res) => {
+  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on the server — add it in Railway → Variables.' });
+  try { res.json(await niche.discover(callScout, String(req.body.focus || '').slice(0, 120), req.body.forceRefresh === true)); }
+  catch (e) { res.status(502).json({ error: e.message }); }
+});
+app.post('/api/niche/evaluate', async (req, res) => {
+  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on the server — add it in Railway → Variables.' });
+  try { res.json({ item: await niche.evaluate(callScout, req.body.idea || {}) }); }
+  catch (e) { res.status(502).json({ error: e.message }); }
+});
+// Free live signals: Hacker News always; Reddit / YouTube only when their keys are set.
+app.get('/api/niche/signals', async (req, res) => {
+  try { res.json(await niche.signals(String(req.query.q || '').slice(0, 80), req.query.refresh === 'true')); }
+  catch (e) { res.status(502).json({ error: e.message }); }
 });
 
 app.listen(PORT, () => {

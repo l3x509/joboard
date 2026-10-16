@@ -279,6 +279,36 @@
   .rel.weak .rel-f { background: var(--text-faint); } .rel.weak b { color: var(--text-faint); }
   .curated-card-rel { margin-top: 4px; }
   .curated-card .curated-lane-tag { max-width: 175px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle; }
+
+  /* ===== Business Niches ===== */
+  .niche-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .niche-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+  .niche-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+  .niche-name { font-weight: 600; font-size: 14px; color: var(--text); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+  .niche-pitch { font-size: 13px; color: var(--text-dim); line-height: 1.45; }
+  .niche-card.compact .niche-pitch { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .niche-parts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 16px; }
+  .niche-part { display: grid; grid-template-columns: 62px 1fr 36px; gap: 5px; align-items: center; font-family: var(--mono); font-size: 10px; color: var(--text-faint); }
+  .np-t { height: 5px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+  .np-f { display: block; height: 100%; background: var(--amber); }
+  .np-n { text-align: right; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .niche-more { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; }
+  .niche-more summary { cursor: pointer; font-family: var(--mono); font-size: 11px; color: var(--amber); }
+  .niche-more p { margin: 6px 0 0; } .niche-more ul { margin: 4px 0 0; padding-left: 18px; }
+  .niche-more a { color: var(--teal); }
+  .niche-more b { color: var(--text); font-weight: 600; }
+  .niche-warn { color: var(--amber); }
+  .niche-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .niche-actions select { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; font-family: var(--mono); font-size: 11px; }
+  .niche-test { font-size: 12.5px; color: var(--text-dim); display: grid; gap: 4px; border-left: 2px solid var(--amber-dim); padding-left: 8px; }
+  .niche-test b { color: var(--text); } .niche-test b.warn { color: var(--amber); } .niche-test .dim { color: var(--text-faint); }
+  .niche-notes-l { display: grid; gap: 3px; font-size: 11px; color: var(--text-faint); }
+  .niche-notes-l textarea { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 6px; font: inherit; font-size: 12px; resize: vertical; }
+  .niche-form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .niche-form input { flex: 1; min-width: 200px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; font: inherit; font-size: 13px; }
+  .niche-form button:disabled { opacity: .6; cursor: wait; }
+  .niche-sub { font-size: 12px; color: var(--text-faint); margin: 0 0 10px; }
+  .niche-signals .adv-row small + small { margin-top: 2px; }
   /* ===== ☰ Advanced drawer ===== */
   .tb-btn.adv-open { border-color: var(--line); }
   .adv-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 60; display: flex; justify-content: flex-end; }
@@ -1208,6 +1238,214 @@
     el.querySelectorAll('[data-dismiss]').forEach(btn => btn.addEventListener('click', () => toggleDismiss(btn.getAttribute('data-dismiss'))));
   }
 
+  // ===================================================================
+  // ===== Business Niches — online business ideas, scored & focused =====
+  // ===================================================================
+  // Scored 0–100 for his capacity (10 hrs/week, <$500, inbound/online).
+  // Hard limit: at most 2 niches in Testing/Building at once.
+  const NICHE_ID = '__niche__';
+  const NICHES_KEY = 'niches-v1';
+  const NICHE_LAST_KEY = 'niche-last-results-v1';
+  const NICHE_SEEDED_KEY = 'niches-seeded-v1';
+  const NICHE_ACTIVE_LIMIT = 2;
+  const NICHE_TEST_DAYS = 14;
+  const NICHE_STATUSES = ['Idea', 'Researching', 'Testing', 'Building', 'Won', 'Parked', 'Killed'];
+  const NICHE_SCORE_PARTS = [['demand', 'Demand', 25], ['reuse', 'Reuse', 25], ['inbound', 'Inbound', 15], ['capacity', 'Capacity', 15], ['competition', 'Gap', 10], ['validation', '2-wk test', 10]];
+  let nicheBusy = '';     // 'discover' | 'evaluate' | 'signals' while a request runs
+  let nicheSignals = null;
+  let nicheEvalDraft = { name: '', description: '' };
+
+  function loadNiches() {
+    let list = loadJSON(NICHES_KEY, []);
+    if (!loadJSON(NICHE_SEEDED_KEY, false)) {
+      // His own earlier ideas, unscored until he runs "Score it"
+      const mine = [
+        ['DriveIQ', 'Uber/rideshare earnings optimizer for Boston drivers: best hours, zones, and per-mile costs for a given car.'],
+        ['Contractor quote analyzer', 'Site where homeowners upload or paste contractor quotes and get a plain-language breakdown, red flags, and fair-price ranges.'],
+        ['Haitian Creole bedside healthcare guide', 'Printable PDF guide of bedside medical phrases and patient-care terms, sold on Gumroad/Etsy.'],
+      ];
+      mine.forEach(([name, description]) => { if (!list.some(n => n.name === name)) list.push({ id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), name, pitch: description, description, source: 'Your idea', status: 'Idea', addedAt: new Date().toISOString(), total: null }); });
+      saveJSON(NICHES_KEY, list); saveJSON(NICHE_SEEDED_KEY, true);
+    }
+    return list;
+  }
+  function saveNiches(list) { saveJSON(NICHES_KEY, list); }
+  function activeNiches(list) { return list.filter(n => n.status === 'Testing' || n.status === 'Building'); }
+
+  function nicheCardHtml(n, opts = {}) {
+    const scored = typeof n.total === 'number';
+    const ev = (n.evidence || []);
+    return `<div class="niche-card ${opts.compact ? 'compact' : ''}">
+      <div class="niche-top">
+        <div class="niche-name">${escapeHtml(n.name)}${n.type ? `<span class="itag">${escapeHtml(n.type)}</span>` : ''}${n.source ? `<span class="itag lanes">${escapeHtml(n.source)}</span>` : ''}</div>
+        ${scored ? relevanceMeter(n.total, '/100', `Niche score ${n.total}/100 for your capacity and assets`) : '<span class="itag">not scored yet</span>'}
+      </div>
+      ${n.pitch ? `<div class="niche-pitch">${escapeHtml(n.pitch)}</div>` : ''}
+      ${scored ? `<div class="niche-parts">${NICHE_SCORE_PARTS.map(([k, label, cap]) => { const v = (n.scores || {})[k] || 0; return `<span class="niche-part" title="${label}: ${v} of ${cap}"><span class="np-l">${label}</span><span class="np-t"><span class="np-f" style="width:${Math.round(100 * v / cap)}%"></span></span><span class="np-n">${v}/${cap}</span></span>`; }).join('')}</div>` : ''}
+      ${scored ? `<details class="niche-more" ${opts.open ? 'open' : ''}><summary>Why you · evidence · test plan</summary>
+        ${n.suggested && n.suggested !== n.pitch ? `<p><b>Sharper version:</b> ${escapeHtml(n.suggested)}</p>` : ''}
+        ${n.why_you ? `<p><b>Why you:</b> ${escapeHtml(n.why_you)}</p>` : ''}
+        ${ev.length ? `<p><b>Evidence:</b></p><ul>${ev.map(e => `<li>${escapeHtml(e.claim || '')} <a target="_blank" rel="noopener" href="${escapeAttr(e.url)}">source ↗</a></li>`).join('')}</ul>` : '<p class="niche-warn">No evidence links found — treat demand as unproven.</p>'}
+        ${n.competition ? `<p><b>Competition:</b> ${escapeHtml(n.competition)}</p>` : ''}
+        ${n.first_dollar ? `<p><b>First dollar:</b> ${escapeHtml(n.first_dollar)}</p>` : ''}
+        ${n.test_2wk ? `<p><b>2-week test:</b> ${escapeHtml(n.test_2wk)}</p>` : ''}
+        ${n.kill_rule ? `<p><b>Kill rule:</b> ${escapeHtml(n.kill_rule)}</p>` : ''}
+      </details>` : ''}
+      ${opts.actions || ''}
+    </div>`;
+  }
+
+  async function nicheApi(path, body) {
+    const r = await fetch(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+    return d;
+  }
+
+  function upsertNiche(item, source, status) {
+    const list = loadNiches();
+    const i = list.findIndex(n => n.name.toLowerCase() === item.name.toLowerCase());
+    if (i >= 0) list[i] = { ...list[i], ...item, source: list[i].source || source, scoredAt: new Date().toISOString() };
+    else list.push({ ...item, id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), source, status: status || 'Idea', addedAt: new Date().toISOString(), scoredAt: new Date().toISOString() });
+    saveNiches(list);
+  }
+
+  function renderNiches(el) {
+    const list = loadNiches();
+    const active = activeNiches(list);
+    const last = loadJSON(NICHE_LAST_KEY, null);
+    const shortlist = list.filter(n => !['Testing', 'Building'].includes(n.status))
+      .sort((a, b) => (['Killed', 'Parked'].includes(a.status) - ['Killed', 'Parked'].includes(b.status)) || ((b.total ?? -1) - (a.total ?? -1)));
+    const dayOf = n => n.testStart ? Math.min(NICHE_TEST_DAYS, Math.max(1, Math.ceil((Date.now() - new Date(n.testStart)) / 86400000))) : null;
+    const savedNames = new Set(list.map(n => n.name.toLowerCase()));
+    const busy = what => nicheBusy === what;
+
+    el.innerHTML = `
+      <div class="lane-header"><div class="lane-header-top"><div>
+        <h1 class="lane-title">Business Niches</h1>
+        <div class="lane-sub">Online businesses scored 0–100 for your capacity: about 10 hours a week, under $500 to launch, inbound selling only. At most ${NICHE_ACTIVE_LIMIT} active tests at a time, each with a 2-week deadline and a kill rule.</div>
+      </div></div></div>
+
+      <div class="isec">
+        <div class="isec-h">Active tests (${active.length}/${NICHE_ACTIVE_LIMIT})</div>
+        ${active.length ? `<div class="niche-grid">${active.map(n => {
+          const d = dayOf(n); const over = n.status === 'Testing' && d >= NICHE_TEST_DAYS;
+          return nicheCardHtml(n, { compact: true, actions: `
+            <div class="niche-test">${n.status === 'Testing' ? `<b class="${over ? 'warn' : ''}">Day ${d} of ${NICHE_TEST_DAYS}</b>${over ? ' · decision due: pass or kill' : ''}` : '<b>Building</b>'}
+              ${n.test_2wk ? `<div><span class="dim">Test:</span> ${escapeHtml(n.test_2wk)}</div>` : ''}
+              ${n.kill_rule ? `<div><span class="dim">Kill if:</span> ${escapeHtml(n.kill_rule)}</div>` : ''}
+              <label class="niche-notes-l">Results so far<textarea data-nnotes="${n.id}" rows="2" placeholder="Visitors, signups, sales, replies…">${escapeHtml(n.notes || '')}</textarea></label>
+            </div>
+            <div class="niche-actions">
+              ${n.status === 'Testing' ? `<button class="curated-collapse-btn" data-nstatus="${n.id}|Building">✓ Passed → build</button>` : `<button class="curated-collapse-btn" data-nstatus="${n.id}|Won">★ First revenue</button>`}
+              <button class="curated-collapse-btn" data-nstatus="${n.id}|Killed">✕ Kill</button>
+              <button class="curated-collapse-btn" data-nstatus="${n.id}|Parked">Park</button>
+            </div>` });
+        }).join('')}</div>` : `<div class="pane-empty">No active test. Pick your best-scoring niche below and click <b>Start 2-week test</b>.</div>`}
+      </div>
+
+      <div class="isec">
+        <div class="isec-h">Find niches <span class="isec-sub">Scout searches the web for demand evidence · a few cents per run · results saved 12 hours</span></div>
+        <div class="niche-form">
+          <input id="nFocus" placeholder="Optional focus, e.g. 'medical practices', 'rideshare drivers', 'printable templates', 'YouTube'" value="${escapeAttr(last && last.focus || '')}">
+          <button class="tb-btn primary" id="nDiscover" ${nicheBusy ? 'disabled' : ''}>${busy('discover') ? 'Researching… (about 1 minute)' : 'Find 6 niches'}</button>
+        </div>
+        ${last && last.items ? `<div class="niche-sub">Last run: ${new Date(last.at).toLocaleString()}${last.focus ? ` · focus "${escapeHtml(last.focus)}"` : ''}</div>
+          <div class="niche-grid">${last.items.map((n, i) => nicheCardHtml(n, { actions: `<div class="niche-actions">${savedNames.has(n.name.toLowerCase()) ? '<span class="itag on">saved</span>' : `<button class="curated-collapse-btn" data-nsave="${i}">+ Save to shortlist</button>`}</div>` })).join('')}</div>` : ''}
+      </div>
+
+      <div class="isec">
+        <div class="isec-h">Score your own idea</div>
+        <div class="niche-form">
+          <input id="nEvalName" placeholder="Idea name" value="${escapeAttr(nicheEvalDraft.name)}">
+          <input id="nEvalDesc" placeholder="One line: who pays, for what" value="${escapeAttr(nicheEvalDraft.description)}" style="flex:2">
+          <button class="tb-btn" id="nEvaluate" ${nicheBusy ? 'disabled' : ''}>${busy('evaluate') ? 'Scoring…' : 'Score it'}</button>
+        </div>
+      </div>
+
+      <div class="isec">
+        <div class="isec-h">Shortlist (${shortlist.length}) <span class="isec-sub">best score first · parked and killed at the bottom</span></div>
+        ${shortlist.length ? `<div class="niche-grid">${shortlist.map(n => nicheCardHtml(n, { compact: true, actions: `
+          <div class="niche-actions">
+            <select data-nsel="${n.id}" aria-label="Status for ${escapeAttr(n.name)}">${NICHE_STATUSES.filter(s => s !== 'Testing' && s !== 'Building').map(s => `<option ${s === n.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
+            ${typeof n.total !== 'number' ? `<button class="curated-collapse-btn" data-nscore="${n.id}" ${nicheBusy ? 'disabled' : ''}>Score it</button>` : ''}
+            ${!['Killed', 'Won'].includes(n.status) ? `<button class="curated-collapse-btn" data-nstart="${n.id}">▶ Start 2-week test</button>` : ''}
+            <button class="curated-collapse-btn" data-ndel="${n.id}">Delete</button>
+          </div>` })).join('')}</div>` : '<div class="pane-empty">Nothing saved yet.</div>'}
+      </div>
+
+      <div class="isec">
+        <div class="isec-h">Live signals <span class="isec-sub">people asking for tools and services · Hacker News free · Reddit and YouTube when their keys are set</span></div>
+        <div class="niche-form">
+          <input id="nSigQ" placeholder="Topic, e.g. 'invoice', 'medical office', 'dashcam', 'tax prep'" value="${escapeAttr(nicheSignals && nicheSignals.q || '')}">
+          <button class="tb-btn" id="nSignals" ${nicheBusy ? 'disabled' : ''}>${busy('signals') ? 'Searching…' : 'Search signals'}</button>
+        </div>
+        ${nicheSignals ? `
+          ${nicheSignals.notes && nicheSignals.notes.length ? `<div class="niche-sub">${nicheSignals.notes.map(escapeHtml).join('<br>')}</div>` : ''}
+          ${nicheSignals.youtube && nicheSignals.youtube.length ? `<div class="itable-wrap"><table class="itable"><thead><tr><th>YouTube channel</th><th>Subscribers</th><th>Videos</th><th>Views / video</th><th>Since</th></tr></thead><tbody>${nicheSignals.youtube.map(c => `<tr><td><a target="_blank" rel="noopener" href="${escapeAttr(c.url)}">${escapeHtml(c.title)}</a></td><td>${c.subs === null ? 'hidden' : c.subs.toLocaleString()}</td><td>${c.videos.toLocaleString()}</td><td>${c.viewsPerVideo.toLocaleString()}</td><td>${(c.created || '').slice(0, 4)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+          ${nicheSignals.items && nicheSignals.items.length ? `<div class="niche-signals">${nicheSignals.items.map((s, i) => `<div class="adv-row"><div><a target="_blank" rel="noopener" href="${escapeAttr(s.url)}">${escapeHtml(s.title || '(untitled)')}</a><span class="adv-reason">${escapeHtml(s.source)}</span>
+            <small>${escapeHtml(s.snippet || '')}</small><small>${s.points} points · ${s.comments} comments · ${postedAgoLabel(s.created)}</small></div>
+            <div class="adv-actions"><button class="curated-collapse-btn" data-nsig="${i}">Score as idea</button></div></div>`).join('')}</div>` : '<div class="pane-empty">No signals for that search.</div>'}` : '<div class="pane-empty">Search a topic, or leave it blank to see recent "I would pay for…" posts.</div>'}
+      </div>`;
+    wireNiches(el);
+  }
+
+  function wireNiches(el) {
+    const rerender = () => { renderNiches(el); renderNav(); };
+    const setStatus = (id, status) => {
+      const list = loadNiches(); const n = list.find(x => x.id === id); if (!n) return;
+      if (['Testing', 'Building'].includes(status) && !['Testing', 'Building'].includes(n.status) && activeNiches(list).length >= NICHE_ACTIVE_LIMIT) {
+        showToast(`You already have ${NICHE_ACTIVE_LIMIT} active tests. Kill, park or finish one first.`); return false;
+      }
+      n.status = status; n.statusAt = new Date().toISOString();
+      if (status === 'Testing') n.testStart = new Date().toISOString();
+      saveNiches(list); return true;
+    };
+    el.querySelectorAll('[data-nstatus]').forEach(b => b.addEventListener('click', () => { const [id, st] = b.getAttribute('data-nstatus').split('|'); setStatus(id, st); rerender(); }));
+    el.querySelectorAll('[data-nstart]').forEach(b => b.addEventListener('click', () => { if (setStatus(b.getAttribute('data-nstart'), 'Testing')) { showToast('Test started — 14 days to hit your kill rule or pass'); } rerender(); }));
+    el.querySelectorAll('[data-nsel]').forEach(s => s.addEventListener('change', () => { setStatus(s.getAttribute('data-nsel'), s.value); rerender(); }));
+    el.querySelectorAll('[data-ndel]').forEach(b => b.addEventListener('click', () => { saveNiches(loadNiches().filter(n => n.id !== b.getAttribute('data-ndel'))); rerender(); }));
+    el.querySelectorAll('[data-nnotes]').forEach(t => t.addEventListener('change', () => { const list = loadNiches(); const n = list.find(x => x.id === t.getAttribute('data-nnotes')); if (n) { n.notes = t.value; saveNiches(list); showToast('Saved'); } }));
+    el.querySelectorAll('[data-nsave]').forEach(b => b.addEventListener('click', () => { const last = loadJSON(NICHE_LAST_KEY, null); const item = last && last.items[+b.getAttribute('data-nsave')]; if (item) { upsertNiche(item, 'Scout'); showToast(`Saved ${item.name}`); rerender(); } }));
+    el.querySelectorAll('[data-nscore]').forEach(b => b.addEventListener('click', async () => {
+      const n = loadNiches().find(x => x.id === b.getAttribute('data-nscore')); if (!n) return;
+      nicheBusy = 'evaluate'; renderNiches(el);
+      try { const { item } = await nicheApi('/api/niche/evaluate', { idea: { name: n.name, description: n.description || n.pitch || '' } }); upsertNiche({ ...item, name: n.name, suggested: item.pitch, pitch: n.description || n.pitch || item.pitch }, n.source); showToast(`${n.name}: ${item.total}/100`); }
+      catch (e) { showToast(`Scoring failed: ${e.message}`); }
+      nicheBusy = ''; rerender();
+    }));
+    const disc = el.querySelector('#nDiscover'); if (disc) disc.addEventListener('click', async () => {
+      const focus = el.querySelector('#nFocus').value.trim();
+      nicheBusy = 'discover'; renderNiches(el);
+      try { const d = await nicheApi('/api/niche/discover', { focus }); saveJSON(NICHE_LAST_KEY, { focus, at: d.at, items: d.items }); }
+      catch (e) { showToast(`Research failed: ${e.message}`); }
+      nicheBusy = ''; rerender();
+    });
+    const ev = el.querySelector('#nEvaluate'); if (ev) ev.addEventListener('click', async () => {
+      nicheEvalDraft = { name: el.querySelector('#nEvalName').value.trim(), description: el.querySelector('#nEvalDesc').value.trim() };
+      if (nicheEvalDraft.name.length < 2) { showToast('Give the idea a name first'); return; }
+      nicheBusy = 'evaluate'; renderNiches(el);
+      try { const { item } = await nicheApi('/api/niche/evaluate', { idea: nicheEvalDraft }); upsertNiche({ ...item, name: nicheEvalDraft.name, description: nicheEvalDraft.description, suggested: item.pitch, pitch: nicheEvalDraft.description || item.pitch }, 'Your idea'); showToast(`${nicheEvalDraft.name}: ${item.total}/100 — saved to shortlist`); nicheEvalDraft = { name: '', description: '' }; }
+      catch (e) { showToast(`Scoring failed: ${e.message}`); }
+      nicheBusy = ''; rerender();
+    });
+    const sig = el.querySelector('#nSignals'); if (sig) sig.addEventListener('click', async () => {
+      const q = el.querySelector('#nSigQ').value.trim();
+      nicheBusy = 'signals'; renderNiches(el);
+      try { nicheSignals = { ...(await nicheApi('/api/niche/signals?q=' + encodeURIComponent(q))), q }; }
+      catch (e) { showToast(`Signal search failed: ${e.message}`); }
+      nicheBusy = ''; renderNiches(el);
+    });
+    el.querySelectorAll('[data-nsig]').forEach(b => b.addEventListener('click', () => {
+      const s = nicheSignals.items[+b.getAttribute('data-nsig')];
+      nicheEvalDraft = { name: (s.title || '').slice(0, 80), description: `From ${s.source}: ${(s.snippet || '').slice(0, 200)}` };
+      renderNiches(el);
+      const box = el.querySelector('#nEvalName'); if (box) { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); box.focus(); }
+      showToast('Edit the name into a business idea, then click Score it');
+    }));
+    ['nFocus', 'nEvalName', 'nEvalDesc', 'nSigQ'].forEach(id => { const i = el.querySelector('#' + id); if (i) i.addEventListener('keydown', e => { if (e.key === 'Enter') ({ nFocus: '#nDiscover', nEvalName: '#nEvaluate', nEvalDesc: '#nEvaluate', nSigQ: '#nSignals' })[id] && el.querySelector(({ nFocus: '#nDiscover', nEvalName: '#nEvaluate', nEvalDesc: '#nEvaluate', nSigQ: '#nSignals' })[id]).click(); }); });
+  }
+
   let liveData = {};       // laneId -> { jobs, error }
   let starredPostings = {};   // { jobId: {id, title, company, url, meta, laneId, laneTitle} }
   let newPostings = [];       // [{id, title, company, url, meta, laneId, laneTitle, created}]
@@ -1394,6 +1632,11 @@
         <span class="nav-label">Target Companies</span>
         <span class="nav-badges"><span class="nav-count">${TARGETS.length}</span></span>
       </div>
+      <div class="nav-item all-lanes ${activeLane === NICHE_ID ? 'active' : ''}" data-nav="${NICHE_ID}">
+        <span class="nav-num">◇</span>
+        <span class="nav-label">Business Niches</span>
+        <span class="nav-badges"><span class="nav-count" title="Active tests">${activeNiches(loadNiches()).length}/${NICHE_ACTIVE_LIMIT}</span></span>
+      </div>
       <div class="nav-divider"></div>`;
 
     el.innerHTML = allItem + LANES.map(l => {
@@ -1495,6 +1738,7 @@
     const el = document.getElementById('mainPane');
     if (activeLane === TARGETS_ID) { renderTargets(el); return; }
     if (activeLane === INTEL_ID) { renderIntel(el); return; }
+    if (activeLane === NICHE_ID) { renderNiches(el); return; }
     const isAll = activeLane === ALL_LANES_ID;
     const lane = isAll ? null : LANES.find(l => l.id === activeLane);
     const anyFetched = Object.keys(liveData).length > 0;
@@ -2173,7 +2417,7 @@
     if (!document.getElementById('advBackdrop').hidden) return;
     const tag = (document.activeElement.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
-    const navIds = [INTEL_ID, ALL_LANES_ID, TARGETS_ID, ...LANES.map(l => l.id)];
+    const navIds = [INTEL_ID, ALL_LANES_ID, TARGETS_ID, NICHE_ID, ...LANES.map(l => l.id)];
     const idx = navIds.indexOf(activeLane);
     if (e.key === 'ArrowDown') { e.preventDefault(); selectLane(navIds[Math.min(idx + 1, navIds.length - 1)]); }
     if (e.key === 'ArrowUp') { e.preventDefault(); selectLane(navIds[Math.max(idx - 1, 0)]); }
@@ -2457,7 +2701,7 @@
         ${sel('advStale', boardSettings.staleDays, 'Flag a lead as stale after', 'No status change for this many days.', [[7, '7 days'], [10, '10 days'], [14, '14 days'], [21, '21 days']])}
       </div>
       <div class="adv-sec"><h3>Board</h3>
-        ${sel('advLanding', boardSettings.landing, 'Open the board on', 'Takes effect next time you load the page.', [[INTEL_ID, 'Niche Intel'], [ALL_LANES_ID, 'All Lanes'], [TARGETS_ID, 'Target Companies']])}
+        ${sel('advLanding', boardSettings.landing, 'Open the board on', 'Takes effect next time you load the page.', [[INTEL_ID, 'Niche Intel'], [ALL_LANES_ID, 'All Lanes'], [TARGETS_ID, 'Target Companies'], [NICHE_ID, 'Business Niches']])}
         <div class="adv-btns" style="margin-top:12px"><button class="curated-collapse-btn" id="advResetSettings">Reset all settings to defaults</button></div>
       </div>`;
   }
