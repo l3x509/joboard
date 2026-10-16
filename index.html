@@ -280,6 +280,17 @@
   .curated-card-rel { margin-top: 4px; }
   .curated-card .curated-lane-tag { max-width: 175px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle; }
 
+  /* ===== Jobs / Business mode ===== */
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
+  .mode-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; padding: 2px; background: var(--bg); }
+  .mode-switch button { background: none; border: none; color: var(--text-dim); font: inherit; font-family: var(--mono); font-size: 12px; padding: 5px 14px; border-radius: 5px; cursor: pointer; }
+  .mode-switch button[aria-selected="true"] { background: var(--panel-2); color: var(--amber); }
+  .mode-switch button:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+  .shell.mode-biz { grid-template-columns: 250px 1fr; grid-template-rows: 56px 1fr; }
+  .shell.mode-biz .topbar { grid-column: 1 / -1; }
+  .shell.mode-biz .curated-strip, .shell.mode-biz .tracker-rail, .shell.mode-biz .job-only { display: none !important; }
+  .nav-group-label { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint); padding: 8px 18px 6px; }
+
   /* ===== Business Niches ===== */
   .niche-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
   .niche-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
@@ -606,14 +617,18 @@
   <div class="topbar">
     <div class="topbar-left">
       <span class="topbar-eyebrow">Ops Board</span>
-      <span class="topbar-title">Dulex's Job Search</span>
+      <span class="topbar-title">Dulex's Ops Board</span>
+      <div class="mode-switch" role="tablist" aria-label="Board mode">
+        <button role="tab" data-mode="jobs" aria-selected="true">Jobs</button>
+        <button role="tab" data-mode="biz" aria-selected="false">Business</button>
+      </div>
     </div>
     <div class="topbar-right">
-      <span class="api-status" id="apiStatus">Checking connection…</span>
-      <button class="tb-btn" id="fetchLiveBtn">🔄 Refresh Live</button>
-      <button class="tb-btn" id="checkAllBtn">⚡ Check All Boards</button>
+      <span class="api-status job-only" id="apiStatus">Checking connection…</span>
+      <button class="tb-btn job-only" id="fetchLiveBtn">🔄 Refresh Live</button>
+      <button class="tb-btn job-only" id="checkAllBtn">⚡ Check All Boards</button>
       <button class="tb-btn scout" id="openScoutBtn">💬 Ask the Scout</button>
-      <button class="tb-btn primary" id="copyPromptBtn">📋 Copy Refresh Request</button>
+      <button class="tb-btn primary job-only" id="copyPromptBtn">📋 Copy Refresh Request</button>
       <button class="tb-btn adv-open" id="openAdvBtn" aria-haspopup="dialog" aria-controls="advDrawer" title="Filtered-out jobs, skill gaps, settings, backup">☰ Advanced</button>
       <div class="topbar-clock">
         <div class="live"><span class="live-dot"></span>ACTIVE</div>
@@ -1244,6 +1259,14 @@
   // Scored 0–100 for his capacity (10 hrs/week, <$500, inbound/online).
   // Hard limit: at most 2 niches in Testing/Building at once.
   const NICHE_ID = '__niche__';
+  const BIZ_VIEWS = [
+    { id: '__niche__', icon: '◇', label: 'Overview', title: 'Business Overview', secs: ['active', 'shortlist'], sub: 'Your active tests and shortlist. Scores are 0–100 for your capacity: about 10 hours a week, under $500 to launch, inbound selling only. At most 2 active tests at a time, each with a 2-week deadline and a kill rule.' },
+    { id: '__niche_find__', icon: '⌕', label: 'Find niches', title: 'Find Niches', secs: ['find'], sub: 'Scout searches the web for online businesses that fit your skills, code and capacity, and backs every demand claim with a link.' },
+    { id: '__niche_score__', icon: '✎', label: 'Score an idea', title: 'Score an Idea', secs: ['score', 'shortlist'], sub: 'Type an idea you already have. Scout checks demand and competitors and scores it against your assets.' },
+    { id: '__niche_signals__', icon: '◉', label: 'Live signals', title: 'Live Signals', secs: ['signals'], sub: 'People asking for tools and services right now. Turn any post into an idea to score.' },
+  ];
+  const isBizView = id => typeof id === 'string' && id.startsWith('__niche');
+  const LAST_VIEWS_KEY = 'last-views-v1';
   const NICHES_KEY = 'niches-v1';
   const NICHE_LAST_KEY = 'niche-last-results-v1';
   const NICHE_SEEDED_KEY = 'niches-seeded-v1';
@@ -1311,6 +1334,7 @@
   }
 
   function renderNiches(el) {
+    const view = BIZ_VIEWS.find(v => v.id === activeLane) || BIZ_VIEWS[0];
     const list = loadNiches();
     const active = activeNiches(list);
     const last = loadJSON(NICHE_LAST_KEY, null);
@@ -1322,11 +1346,11 @@
 
     el.innerHTML = `
       <div class="lane-header"><div class="lane-header-top"><div>
-        <h1 class="lane-title">Business Niches</h1>
-        <div class="lane-sub">Online businesses scored 0–100 for your capacity: about 10 hours a week, under $500 to launch, inbound selling only. At most ${NICHE_ACTIVE_LIMIT} active tests at a time, each with a 2-week deadline and a kill rule.</div>
+        <h1 class="lane-title">${escapeHtml(view.title)}</h1>
+        <div class="lane-sub">${escapeHtml(view.sub)}</div>
       </div></div></div>
 
-      <div class="isec">
+      <div class="isec" data-nsec="active">
         <div class="isec-h">Active tests (${active.length}/${NICHE_ACTIVE_LIMIT})</div>
         ${active.length ? `<div class="niche-grid">${active.map(n => {
           const d = dayOf(n); const over = n.status === 'Testing' && d >= NICHE_TEST_DAYS;
@@ -1344,7 +1368,7 @@
         }).join('')}</div>` : `<div class="pane-empty">No active test. Pick your best-scoring niche below and click <b>Start 2-week test</b>.</div>`}
       </div>
 
-      <div class="isec">
+      <div class="isec" data-nsec="find">
         <div class="isec-h">Find niches <span class="isec-sub">Scout searches the web for demand evidence · a few cents per run · results saved 12 hours</span></div>
         <div class="niche-form">
           <input id="nFocus" placeholder="Optional focus, e.g. 'medical practices', 'rideshare drivers', 'printable templates', 'YouTube'" value="${escapeAttr(last && last.focus || '')}">
@@ -1354,7 +1378,7 @@
           <div class="niche-grid">${last.items.map((n, i) => nicheCardHtml(n, { actions: `<div class="niche-actions">${savedNames.has(n.name.toLowerCase()) ? '<span class="itag on">saved</span>' : `<button class="curated-collapse-btn" data-nsave="${i}">+ Save to shortlist</button>`}</div>` })).join('')}</div>` : ''}
       </div>
 
-      <div class="isec">
+      <div class="isec" data-nsec="score">
         <div class="isec-h">Score your own idea</div>
         <div class="niche-form">
           <input id="nEvalName" placeholder="Idea name" value="${escapeAttr(nicheEvalDraft.name)}">
@@ -1363,7 +1387,7 @@
         </div>
       </div>
 
-      <div class="isec">
+      <div class="isec" data-nsec="shortlist">
         <div class="isec-h">Shortlist (${shortlist.length}) <span class="isec-sub">best score first · parked and killed at the bottom</span></div>
         ${shortlist.length ? `<div class="niche-grid">${shortlist.map(n => nicheCardHtml(n, { compact: true, actions: `
           <div class="niche-actions">
@@ -1374,7 +1398,7 @@
           </div>` })).join('')}</div>` : '<div class="pane-empty">Nothing saved yet.</div>'}
       </div>
 
-      <div class="isec">
+      <div class="isec" data-nsec="signals">
         <div class="isec-h">Live signals <span class="isec-sub">people asking for tools and services · Hacker News free · Reddit and YouTube when their keys are set</span></div>
         <div class="niche-form">
           <input id="nSigQ" placeholder="Topic, e.g. 'invoice', 'medical office', 'dashcam', 'tax prep'" value="${escapeAttr(nicheSignals && nicheSignals.q || '')}">
@@ -1387,6 +1411,10 @@
             <small>${escapeHtml(s.snippet || '')}</small><small>${s.points} points · ${s.comments} comments · ${postedAgoLabel(s.created)}</small></div>
             <div class="adv-actions"><button class="curated-collapse-btn" data-nsig="${i}">Score as idea</button></div></div>`).join('')}</div>` : '<div class="pane-empty">No signals for that search.</div>'}` : '<div class="pane-empty">Search a topic, or leave it blank to see recent "I would pay for…" posts.</div>'}
       </div>`;
+    el.querySelectorAll('[data-nsec]').forEach(sec => { if (!view.secs.includes(sec.getAttribute('data-nsec'))) sec.remove(); });
+    if (view.id === '__niche__' && !active.length && !list.some(n => typeof n.total === 'number')) {
+      el.querySelector('[data-nsec="active"]').insertAdjacentHTML('beforebegin', `<div class="context-note">Start here: open <b>Score an idea</b> to score your saved ideas, or <b>Find niches</b> to research new ones. Then start a 2-week test on the best one.</div>`);
+    }
     wireNiches(el);
   }
 
@@ -1439,7 +1467,7 @@
     el.querySelectorAll('[data-nsig]').forEach(b => b.addEventListener('click', () => {
       const s = nicheSignals.items[+b.getAttribute('data-nsig')];
       nicheEvalDraft = { name: (s.title || '').slice(0, 80), description: `From ${s.source}: ${(s.snippet || '').slice(0, 200)}` };
-      renderNiches(el);
+      selectLane('__niche_score__');
       const box = el.querySelector('#nEvalName'); if (box) { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); box.focus(); }
       showToast('Edit the name into a business idea, then click Score it');
     }));
@@ -1608,8 +1636,38 @@
   }
 
   // ===== Nav rail =====
+  function renderBizNav(el) {
+    const list = loadNiches();
+    const last = loadJSON(NICHE_LAST_KEY, null);
+    const badge = { '__niche__': `${activeNiches(list).length}/${NICHE_ACTIVE_LIMIT}`, '__niche_find__': last && last.items ? last.items.length : '', '__niche_score__': list.filter(n => typeof n.total !== 'number').length ? `${list.filter(n => typeof n.total !== 'number').length} unscored` : '', '__niche_signals__': nicheSignals && nicheSignals.items ? nicheSignals.items.length : '' };
+    el.innerHTML = `<div class="nav-group-label">Business</div>` + BIZ_VIEWS.map(v => `
+      <div class="nav-item all-lanes ${activeLane === v.id ? 'active' : ''}" data-nav="${v.id}">
+        <span class="nav-num">${v.icon}</span>
+        <span class="nav-label">${escapeHtml(v.label)}</span>
+        <span class="nav-badges">${badge[v.id] !== '' && badge[v.id] !== undefined ? `<span class="nav-count">${badge[v.id]}</span>` : ''}</span>
+      </div>`).join('') + `
+      <div class="nav-divider"></div>
+      <div class="nav-footnote">${list.length} niches saved · ${list.filter(n => n.status === 'Killed').length} killed · ${list.filter(n => n.status === 'Won').length} with revenue<br>↑↓ to move</div>`;
+    el.querySelectorAll('[data-nav]').forEach(item => item.addEventListener('click', () => selectLane(item.getAttribute('data-nav'))));
+  }
+
+  // Jobs / Business mode follows the active view; each mode remembers its last view.
+  function applyMode() {
+    const biz = isBizView(activeLane);
+    document.querySelector('.shell').classList.toggle('mode-biz', biz);
+    document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-selected', String((b.getAttribute('data-mode') === 'biz') === biz)));
+    const lv = loadJSON(LAST_VIEWS_KEY, {}); lv[biz ? 'biz' : 'jobs'] = activeLane; saveJSON(LAST_VIEWS_KEY, lv);
+  }
+  function switchMode(mode) {
+    const lv = loadJSON(LAST_VIEWS_KEY, {});
+    if (mode === 'biz' && !isBizView(activeLane)) selectLane(isBizView(lv.biz) ? lv.biz : NICHE_ID);
+    if (mode === 'jobs' && isBizView(activeLane)) selectLane(lv.jobs && !isBizView(lv.jobs) ? lv.jobs : INTEL_ID);
+  }
+
   function renderNav() {
     const el = document.getElementById('navRail');
+    applyMode();
+    if (isBizView(activeLane)) { renderBizNav(el); return; }
     const allCount = filteredJobsForLane(ALL_LANES_ID).length;
     updateLiveStatus(allCount);
     const anyFetched = Object.keys(liveData).length > 0;
@@ -1631,11 +1689,6 @@
         <span class="nav-num">◎</span>
         <span class="nav-label">Target Companies</span>
         <span class="nav-badges"><span class="nav-count">${TARGETS.length}</span></span>
-      </div>
-      <div class="nav-item all-lanes ${activeLane === NICHE_ID ? 'active' : ''}" data-nav="${NICHE_ID}">
-        <span class="nav-num">◇</span>
-        <span class="nav-label">Business Niches</span>
-        <span class="nav-badges"><span class="nav-count" title="Active tests">${activeNiches(loadNiches()).length}/${NICHE_ACTIVE_LIMIT}</span></span>
       </div>
       <div class="nav-divider"></div>`;
 
@@ -1738,7 +1791,7 @@
     const el = document.getElementById('mainPane');
     if (activeLane === TARGETS_ID) { renderTargets(el); return; }
     if (activeLane === INTEL_ID) { renderIntel(el); return; }
-    if (activeLane === NICHE_ID) { renderNiches(el); return; }
+    if (isBizView(activeLane)) { renderNiches(el); return; }
     const isAll = activeLane === ALL_LANES_ID;
     const lane = isAll ? null : LANES.find(l => l.id === activeLane);
     const anyFetched = Object.keys(liveData).length > 0;
@@ -2417,7 +2470,7 @@
     if (!document.getElementById('advBackdrop').hidden) return;
     const tag = (document.activeElement.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
-    const navIds = [INTEL_ID, ALL_LANES_ID, TARGETS_ID, NICHE_ID, ...LANES.map(l => l.id)];
+    const navIds = isBizView(activeLane) ? BIZ_VIEWS.map(v => v.id) : [INTEL_ID, ALL_LANES_ID, TARGETS_ID, ...LANES.map(l => l.id)];
     const idx = navIds.indexOf(activeLane);
     if (e.key === 'ArrowDown') { e.preventDefault(); selectLane(navIds[Math.min(idx + 1, navIds.length - 1)]); }
     if (e.key === 'ArrowUp') { e.preventDefault(); selectLane(navIds[Math.max(idx - 1, 0)]); }
@@ -2868,6 +2921,7 @@
   }
 
   document.getElementById('openAdvBtn').addEventListener('click', () => openAdv());
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => switchMode(b.getAttribute('data-mode'))));
   document.getElementById('advCloseBtn').addEventListener('click', closeAdv);
   document.getElementById('advBackdrop').addEventListener('click', e => { if (e.target.id === 'advBackdrop') closeAdv(); });
   document.querySelectorAll('.adv-tab').forEach(t => t.addEventListener('click', () => { advTab = t.getAttribute('data-advtab'); renderAdv(); document.getElementById('advBody').scrollTop = 0; }));
