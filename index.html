@@ -289,6 +289,7 @@
   .shell.mode-biz { grid-template-columns: 250px 1fr; grid-template-rows: 56px 1fr; }
   .shell.mode-biz .topbar { grid-column: 1 / -1; }
   .shell.mode-biz .curated-strip, .shell.mode-biz .tracker-rail, .shell.mode-biz .job-only { display: none !important; }
+  .shell:not(.mode-biz) .biz-only { display: none !important; }
   .nav-group-label { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint); padding: 8px 18px 6px; }
 
   /* ===== Business Niches ===== */
@@ -653,6 +654,8 @@
     </div>
     <div class="topbar-right">
       <span class="api-status job-only" id="apiStatus">Checking connection…</span>
+      <span class="api-status biz-only" id="bizStatus">Business data not refreshed yet</span>
+      <button class="tb-btn biz-only" id="bizRefreshBtn" title="Reload hot finds, Show HN launches, your last signal search, and re-run the pattern analysis if there are new finds. Does not start a paid web scan.">🔄 Refresh Business</button>
       <button class="tb-btn job-only" id="fetchLiveBtn">🔄 Refresh Live</button>
       <button class="tb-btn job-only" id="checkAllBtn">⚡ Check All Boards</button>
       <button class="tb-btn scout" id="openScoutBtn">💬 Ask the Scout</button>
@@ -1810,6 +1813,50 @@
     nicheHot = d; nicheHotFetched = Date.now(); saveJSON(NICHE_HOT_KEY, d); return d;
   }
 
+  async function requestHotAnalysis(force) {
+    const board = loadNiches().map(n => ({ name: n.name, pitch: n.description || n.pitch || '', status: n.status }));
+    const d = await nicheApi('/api/niche/hot/analyze', { force, board });
+    if (nicheHot) { if (d.analysis) nicheHot.analysis = d.analysis; nicheHot.analysisError = d.error || null; saveJSON(NICHE_HOT_KEY, nicheHot); }
+    return d;
+  }
+
+  // ===== Business refresh (independent of the Jobs "Refresh Live") =====
+  const BIZ_REFRESHED_KEY = 'biz-refreshed-v1';
+  let bizRefreshing = false;
+  function updateBizStatus(msg) {
+    const el = document.getElementById('bizStatus'); if (!el) return;
+    if (msg) { el.textContent = msg; return; }
+    const at = loadJSON(BIZ_REFRESHED_KEY, 0);
+    const n = nicheHot && nicheHot.items ? nicheHot.items.length : 0;
+    el.textContent = at ? `Business updated ${new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · ${n} hot finds` : 'Business data not refreshed yet';
+  }
+  async function refreshBusiness({ quiet = false } = {}) {
+    if (bizRefreshing) return;
+    bizRefreshing = true;
+    const btn = document.getElementById('bizRefreshBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Refreshing…'; }
+    updateBizStatus('Refreshing business data…');
+    const before = nicheHot && nicheHot.items ? nicheHot.items.length : 0;
+    const problems = [];
+    await Promise.all([
+      fetchHot().catch(e => problems.push('hot finds: ' + e.message)),
+      nicheSignals ? nicheApi('/api/niche/signals?refresh=true&q=' + encodeURIComponent(nicheSignals.q || '')).then(d => { nicheSignals = { ...d, q: nicheSignals.q }; }).catch(e => problems.push('signals: ' + e.message)) : null,
+    ]);
+    const n = nicheHot && nicheHot.items ? nicheHot.items.length : 0;
+    let analyzed = false;
+    if (n && nicheHot.aiOn !== false && !nicheHot.analyzing && (!nicheHot.analysis || nicheHot.analysis.basedOn !== n)) {
+      updateBizStatus('Analyzing new hot finds…');
+      try { await requestHotAnalysis(false); analyzed = true; } catch (e) { problems.push('analysis: ' + e.message); }
+    }
+    saveJSON(BIZ_REFRESHED_KEY, Date.now());
+    bizRefreshing = false;
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Refresh Business'; }
+    updateBizStatus();
+    if (isBizView(activeLane)) selectLane(activeLane);
+    renderNav();
+    if (!quiet || problems.length) showToast(problems.length ? 'Refresh had problems — ' + problems.join('; ') : `Business refreshed — ${n} hot finds${n > before ? ` (${n - before} new)` : ''}${analyzed ? ', patterns re-analyzed' : ''}`);
+  }
+
   function bizHotHtml(list) {
     const h = nicheHot;
     const saved = new Set(list.map(n => n.name.toLowerCase()));
@@ -1919,10 +1966,7 @@
     const runAnalysis = async force => {
       nicheBusy = 'analyze'; renderNiches(el);
       try {
-        const board = loadNiches().map(n => ({ name: n.name, pitch: n.description || n.pitch || '', status: n.status }));
-        const d = await nicheApi('/api/niche/hot/analyze', { force, board });
-        if (d.analysis) { nicheHot.analysis = d.analysis; saveJSON(NICHE_HOT_KEY, nicheHot); }
-        nicheHot.analysisError = d.error || null;
+        const d = await requestHotAnalysis(force);
         showToast(d.note || (d.error ? 'Analysis failed: ' + d.error : d.running ? 'Analysis already running — check back in a minute' : `Found ${d.analysis.angles.length} blind angles, ${d.analysis.gaps.length} gaps`));
       } catch (e) { showToast(`Analysis failed: ${e.message}`); }
       nicheBusy = ''; if (activeLane === '__niche_hot__') rerender();
@@ -2260,7 +2304,8 @@
 
   // ===== Nav rail =====
   function renderBizNav(el) {
-    if (!hotBgFetch) { hotBgFetch = true; fetchHot().then(() => renderNav()).catch(() => {}); }
+    if (!hotBgFetch) { hotBgFetch = true; setTimeout(() => { if (Date.now() - loadJSON(BIZ_REFRESHED_KEY, 0) > 30 * 60 * 1000) refreshBusiness({ quiet: true }); else fetchHot().then(() => { updateBizStatus(); renderNav(); }).catch(() => {}); }, 0); }
+    updateBizStatus();
     const list = loadNiches();
     const last = loadJSON(NICHE_LAST_KEY, null);
     const badge = { '__niche__': `${activeNiches(list).length}/${NICHE_ACTIVE_LIMIT}`, '__niche_find__': last && last.items ? last.items.length : '', '__niche_score__': list.filter(n => typeof n.total !== 'number').length ? `${list.filter(n => typeof n.total !== 'number').length} unscored` : '', '__niche_signals__': nicheSignals && nicheSignals.items ? nicheSignals.items.length : '', '__niche_map__': bizFilter.tags.length || bizFilter.q || bizFilter.fits ? 'filtered' : '', '__niche_hot__': hotNewCount() ? `${hotNewCount()} new` : '' };
@@ -2888,6 +2933,7 @@
     }
   }
   document.getElementById('fetchLiveBtn').addEventListener('click', fetchLivePostings);
+  document.getElementById('bizRefreshBtn').addEventListener('click', () => refreshBusiness());
   loadFilterState();
   // Deferred one tick: the This Week storage keys are declared further down
   // this script, so calling loadWeekState() here hit them before they existed
