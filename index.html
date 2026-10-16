@@ -296,6 +296,8 @@
   .niche-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
   .niche-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
   .niche-name { font-weight: 600; font-size: 14px; color: var(--text); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+  .niche-past { font-size: 12px; color: var(--text-faint); margin-top: 6px; line-height: 1.45; }
+  .niche-past a { color: var(--teal); }
   .niche-pitch { font-size: 13px; color: var(--text-dim); line-height: 1.45; }
   .niche-card.compact .niche-pitch { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .niche-parts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 16px; }
@@ -1270,6 +1272,7 @@
   const NICHES_KEY = 'niches-v1';
   const NICHE_LAST_KEY = 'niche-last-results-v1';
   const NICHE_SEEDED_KEY = 'niches-seeded-v1';
+  const NICHE_PAST_KEY = 'niches-seeded-past-v1';
   const NICHE_ACTIVE_LIMIT = 2;
   const NICHE_TEST_DAYS = 14;
   const NICHE_STATUSES = ['Idea', 'Researching', 'Testing', 'Building', 'Won', 'Parked', 'Killed'];
@@ -1290,6 +1293,164 @@
       mine.forEach(([name, description]) => { if (!list.some(n => n.name === name)) list.push({ id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), name, pitch: description, description, source: 'Your idea', status: 'Idea', addedAt: new Date().toISOString(), total: null }); });
       saveJSON(NICHES_KEY, list); saveJSON(NICHE_SEEDED_KEY, true);
     }
+    // Ideas from earlier Claude chats: merged once per name, never overwriting his edits
+    if (!loadJSON(NICHE_PAST_KEY, false)) {
+      const PAST = [
+        [
+        "Field-service compliance tracker (SaaS)",
+        "Productize the Windows Upgrade Tracker + photo-packet tool into a multi-tenant app for field-service teams that must document device upgrades for audits.",
+        "Working prototype exists; needs generalizing for other companies. B2B sales would need some outreach.",
+        "https://claude.ai/chat/6c80bb0d-252a-4fa7-92aa-512a032a2c21"
+        ],
+        [
+        "ClearImmi form-prep tier for small firms",
+        "Paid B2B tier on ClearImmi that automates immigration form prep and case tracking for small law firms and preparers.",
+        "Partly built; liability and keeping the free public mission separate were the main concerns.",
+        "https://claude.ai/chat/6c80bb0d-252a-4fa7-92aa-512a032a2c21"
+        ],
+        [
+        "VinBidIQ dealer subscription",
+        "Auction run-list scoring for used-car dealers: profit score, recon estimate, listing copy.",
+        "At parity with Carbly on AI scoring; behind on make coverage and licensed data. Data resale ruled out (Manheim terms).",
+        "https://claude.ai/chat/6c80bb0d-252a-4fa7-92aa-512a032a2c21"
+        ],
+        [
+        "Back-office AI agent service",
+        "Done-for-you outcome (e.g. intake form processing, bid research) delivered by email/Slack, $500–2000/mo per client.",
+        "Fits async style; no existing infrastructure advantage.",
+        "https://claude.ai/chat/6c80bb0d-252a-4fa7-92aa-512a032a2c21"
+        ],
+        [
+        "South Shore pay-per-lead quote site",
+        "Separate local site for Randolph/Brockton/Holbrook/Weymouth/Stoughton where the money is a quote-request form sold as leads to local businesses, not the listings.",
+        "Weak local competition; Angi/Thumbtack/Yelp are the real rivals. Signing up lead buyers needs outreach.",
+        "https://claude.ai/chat/542806d8-f804-4f97-88f2-0d5d44532c98"
+        ],
+        [
+        "Neighborhood alert tool",
+        "Parking bans, trash-schedule changes and permit deadlines pulled from public town data and pushed as alerts; freemium.",
+        "Listed as an inbound/async clone-locally model; not evaluated in depth.",
+        "https://claude.ai/chat/542806d8-f804-4f97-88f2-0d5d44532c98"
+        ],
+        [
+        "Local events newsletter",
+        "Pull town Facebook groups, permits and town-hall postings into one clean site/newsletter, monetized with local business ads.",
+        "Listed as an inbound/async clone-locally model; not evaluated in depth.",
+        "https://claude.ai/chat/542806d8-f804-4f97-88f2-0d5d44532c98"
+        ],
+        [
+        "Phone bill analyzer",
+        "Upload your phone bill and see your real savings by switching, net of financing and promo credits; MVNO affiliate payouts plus paid switching help.",
+        "Generic plan comparison is crowded (WhistleOut, Rocket Money); the personalized bill analysis is the gap. Validate with one landing page.",
+        "https://claude.ai/chat/d83cd60b-2a83-4656-bb42-73693c1cc88d"
+        ],
+        [
+        "Prompt rewriter + auto-answer",
+        "\"Let me AI that for you\": rewrites a rough question into a strong prompt, sends it, and returns the answer in one flow.",
+        "Most competitors stop at rewriting; Chrome extension is the main channel. MVP was built.",
+        "https://claude.ai/chat/85e6e87d-0e34-456e-818f-d0c5986e0a70"
+        ],
+        [
+        "True-cost-of-debt checkout extension",
+        "Browser extension that shows the real cost of a purchase on credit before checkout, not after.",
+        "Pay Down and Onus already do the after-the-fact version; point-of-purchase interception is the gap.",
+        "https://claude.ai/chat/990d63ba-b759-45b2-b1be-d1c285306e7d"
+        ],
+        [
+        "Done-for-you resale service",
+        "Hands-off service that sells household items for people who want clutter gone, taking a cut.",
+        "Gap around small hauls of general household goods (MaxSold, ThredUp, Decluttr exist). Needs physical handling.",
+        "https://claude.ai/chat/990d63ba-b759-45b2-b1be-d1c285306e7d"
+        ],
+        [
+        "Mobile DNA & specimen collection",
+        "Mobile DNA/drug-test collection through AABB lab partners (e.g. DDC), paired with background screening for employers and attorneys.",
+        "Growing niche with several revenue streams; needs certification and in-person work.",
+        "https://claude.ai/chat/9d40d96d-a001-4d4f-8252-7f79f4217961"
+        ],
+        [
+        "Root Access — IT humor newsletter",
+        "Substack newsletter for senior IT/sysadmin folks: jokes, ticket of the week, horror stories. Free tier + $5/mo paid.",
+        "Big sysadmin audience on Reddit; start on Substack, no website. Sample issue was written.",
+        "https://claude.ai/chat/6cfba033-e635-4e5a-97ee-fe42f5b3e9d9"
+        ],
+        [
+        "Printable affirmation card packs",
+        "AI-assisted themed affirmation card packs sold as instant downloads on Etsy/Gumroad, $5–15.",
+        "Proven Etsy demand; 3–4 hours per pack; aim was ~$5/day.",
+        "https://claude.ai/chat/6cfba033-e635-4e5a-97ee-fe42f5b3e9d9"
+        ],
+        [
+        "Dispute document-prep services",
+        "Done-for-you letters and prep packs for people up against institutions: small claims, lease negotiation, contractor or utility disputes, vet bills.",
+        "One of 12 document-prep ideas; avoid anything that becomes legal advice.",
+        "https://claude.ai/chat/6cfba033-e635-4e5a-97ee-fe42f5b3e9d9"
+        ],
+        [
+        "Know Your Rights system-navigation site",
+        "Plain-English guides to medical bills, insurance denials, tenant rights, debt collectors; ads + paid guides.",
+        "High CPM and real content gap; AI Overviews are the main threat. Healthcare pillar first.",
+        "https://claude.ai/chat/3c11ee64-6f4d-409a-8fa4-d9b46e674c26"
+        ],
+        [
+        "Carfax for home",
+        "A history report for a house: past repairs, permits and known issues, for buyers and owners.",
+        "Best version was a media brand (site + YouTube + newsletter), which is more work.",
+        "https://claude.ai/chat/3c11ee64-6f4d-409a-8fa4-d9b46e674c26"
+        ],
+        [
+        "AI relocation advisor (affiliate)",
+        "Intake form → personalized country/visa/cost-of-living plan for remote workers, earning on insurance, banking and tax referrals.",
+        "About $0.03 per user in API cost; moat ideas were outcome data and an attorney-verified visa database.",
+        "https://claude.ai/chat/82ddd193-3452-4cf5-8d82-d442fb8dc9a5"
+        ],
+        [
+        "Medical device security for small practices",
+        "Connected-device security and compliance support for dental, urgent care and small clinics that big HTM contractors ignore.",
+        "Matches Zeiss + security background; local healthcare MSPs already exist, so solo vs subcontract was the open question.",
+        "https://claude.ai/chat/c9269500-3669-4a3c-b7e7-d5d47a599415"
+        ],
+        [
+        "Field-tech smart-hands network",
+        "Referral pipeline that connects IT/MSP firms to vetted on-site techs, charging per introduction plus a recurring fee.",
+        "Variation of the contractor-referral model; pressure-tested for demand and competition.",
+        "https://claude.ai/chat/1624dcb6-4381-47f7-8d8a-08f78c899a48"
+        ],
+        [
+        "Cyber-insurance readiness service",
+        "Help small businesses meet cyber-insurance questionnaires and controls before renewal.",
+        "Uses Security+/AZ-500 background; vendor stats on demand flagged as unverified.",
+        "https://claude.ai/chat/1624dcb6-4381-47f7-8d8a-08f78c899a48"
+        ],
+        [
+        "Compliance calendar for property managers",
+        "Tracks inspections, permits and code deadlines for property managers and brokers the trade work.",
+        "Needs trade-code literacy, not a real estate license.",
+        "https://claude.ai/chat/1624dcb6-4381-47f7-8d8a-08f78c899a48"
+        ],
+        [
+        "Celebrity social aggregator (fan hub)",
+        "Summarize what popular stars post (from news sites and YouTube, not scraping) with thumbs up/down voting.",
+        "Scraping platforms is off the table; fan-hub framing to avoid defamation risk; could live inside Baz.",
+        "https://claude.ai/chat/c5c4cc4a-877f-4c5a-97b5-8fbf9262e149"
+        ],
+        [
+        "Baz Engine (white-label directory)",
+        "Directory-as-a-service: the Baz directory + WhatsApp bot licensed to other communities and groups.",
+        "Proposed while the core Baz monetization (10 paying businesses) was still incomplete.",
+        "https://claude.ai/chat/0522f631-1948-4963-b7b9-9bf6a29eaa17"
+        ]
+        ];
+      const LINKS = {"DriveIQ": "https://claude.ai/chat/67cce3ca-4966-4b56-bb45-e01555a44565", "Contractor quote analyzer": "https://claude.ai/chat/ad739ce9-c81c-43e7-8452-95d1c6e7e0ff", "Haitian Creole bedside healthcare guide": "https://claude.ai/chat/2e7f61e6-ef09-4925-b8f0-b3c7f86f4e13"};
+      const has = name => list.find(n => n.name.toLowerCase() === name.toLowerCase());
+      PAST.forEach(([name, description, pastNote, chatUrl], i) => {
+        const hit = has(name);
+        if (hit) { hit.chatUrl = hit.chatUrl || chatUrl; hit.pastNote = hit.pastNote || pastNote; return; }
+        list.push({ id: 'n' + Date.now() + i + Math.random().toString(36).slice(2, 6), name, pitch: description, description, pastNote, chatUrl, source: 'Past chat', status: 'Idea', addedAt: new Date().toISOString(), total: null });
+      });
+      Object.entries(LINKS).forEach(([name, url]) => { const hit = has(name); if (hit && !hit.chatUrl) hit.chatUrl = url; });
+      saveJSON(NICHES_KEY, list); saveJSON(NICHE_PAST_KEY, true);
+    }
     return list;
   }
   function saveNiches(list) { saveJSON(NICHES_KEY, list); }
@@ -1304,6 +1465,7 @@
         ${scored ? relevanceMeter(n.total, '/100', `Niche score ${n.total}/100 for your capacity and assets`) : '<span class="itag">not scored yet</span>'}
       </div>
       ${n.pitch ? `<div class="niche-pitch">${escapeHtml(n.pitch)}</div>` : ''}
+      ${n.pastNote || n.chatUrl ? `<div class="niche-past">${n.pastNote ? `<b>Earlier take:</b> ${escapeHtml(n.pastNote)} ` : ''}${n.chatUrl ? `<a target="_blank" rel="noopener" href="${escapeAttr(n.chatUrl)}">open chat ↗</a>` : ''}</div>` : ''}
       ${scored ? `<div class="niche-parts">${NICHE_SCORE_PARTS.map(([k, label, cap]) => { const v = (n.scores || {})[k] || 0; return `<span class="niche-part" title="${label}: ${v} of ${cap}"><span class="np-l">${label}</span><span class="np-t"><span class="np-f" style="width:${Math.round(100 * v / cap)}%"></span></span><span class="np-n">${v}/${cap}</span></span>`; }).join('')}</div>` : ''}
       ${scored ? `<details class="niche-more" ${opts.open ? 'open' : ''}><summary>Why you · evidence · test plan</summary>
         ${n.suggested && n.suggested !== n.pitch ? `<p><b>Sharper version:</b> ${escapeHtml(n.suggested)}</p>` : ''}
