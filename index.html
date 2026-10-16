@@ -315,6 +315,9 @@
   .bpairs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
   .bpair { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font-size: 13px; color: var(--text); display: grid; gap: 6px; }
   .bpair div { display: flex; flex-wrap: wrap; gap: 4px; }
+  .hsub { font-family: var(--mono); font-size: 11px; color: var(--text); margin: 16px 0 8px; text-transform: uppercase; letter-spacing: .06em; }
+  .hsub .dim { text-transform: none; letter-spacing: 0; }
+  .hot-analysis { background: var(--panel-2, var(--panel)); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
   .hot-meta { display: grid; gap: 4px; font-size: 12px; color: var(--text-dim); line-height: 1.45; }
   .hot-meta .dim, .dim { color: var(--text-faint); }
   .warn { color: var(--amber); }
@@ -1798,6 +1801,7 @@
   let hotView = Object.assign({ q: '', sort: 'new', onlyOverlap: false, openOnly: false, onlyNew: false }, loadJSON(HOT_VIEW_KEY, {}));
   let hotVisitPrev = null;   // last visit before this session's first look — 'new' is relative to it
   let hotBgFetch = false;
+  let hotAutoAnalyzed = false;
   const hotNewCount = () => { const v = loadJSON(NICHE_HOT_VISIT_KEY, ''); return nicheHot && nicheHot.items ? nicheHot.items.filter(i => !v || (i.firstSeen || '') > v).length : 0; };
 
   async function fetchHot({ refresh = false, area = '' } = {}) {
@@ -1845,6 +1849,28 @@
           <button class="curated-collapse-btn" id="hAnalyze" style="margin-top:8px">Analyze all hot finds in Overlaps →</button></div>
       </div>` : ''}
 
+      ${all.length ? (() => { const an = h.analysis; const stale = an && an.basedOn !== all.length; return `<div class="isec hot-analysis"><div class="isec-h">Patterns, blind angles &amp; gaps <span class="isec-sub">Scout reads all ${all.length} finds together and checks each angle on the web · refreshes after every scan</span></div>
+        <div class="niche-form" style="align-items:center">
+          <button class="tb-btn ${an ? '' : 'primary'}" id="hAnalyzeRun" ${nicheBusy || h.analyzing ? 'disabled' : ''}>${nicheBusy === 'analyze' || h.analyzing ? 'Analyzing all finds… (1–2 minutes)' : an ? (stale ? `Re-analyze (${all.length - an.basedOn > 0 ? all.length - an.basedOn + ' new finds' : 'finds changed'})` : 'Re-analyze') : 'Find patterns, blind angles & gaps'}</button>
+          <span class="niche-sub" style="margin:0">${an ? `Last analysis ${new Date(an.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · based on ${an.basedOn} finds` : 'Not analyzed yet.'}${h.analysisError ? ` · <span class="warn">last try failed: ${escapeHtml(h.analysisError)}</span>` : ''}</span>
+        </div>
+        ${an ? `
+          ${an.clusters.length ? `<div class="hsub">Overlap clusters <span class="dim">· finds that are really the same pattern</span></div>
+          <div class="incs">${an.clusters.map(c => `<div class="inc"><div class="inc-h">${escapeHtml(c.name)} <span>· ${c.members.length} finds</span></div>
+            <div class="inc-s">${escapeHtml(c.pattern)}</div>
+            ${c.why_now ? `<div class="inc-p"><div class="inc-pl">Why now</div>${escapeHtml(c.why_now)}</div>` : ''}
+            <div class="niche-tags">${c.members.map(m => `<button class="btag" data-hfind="${escapeAttr(m)}" title="Show this find">${escapeHtml(m)}</button>`).join('')}</div></div>`).join('')}</div>` : ''}
+          ${an.angles.length ? `<div class="hsub">Blind angles <span class="dim">· businesses the patterns point to that nobody on either list is doing</span></div>
+          <div class="niche-grid">${an.angles.map((a, i) => nicheCardHtml({ ...a, source: a.angle_type }, { compact: true, extra: `<div class="hot-meta">
+              ${a.built_from && a.built_from.length ? `<div><span class="dim">Built from:</span> ${a.built_from.map(escapeHtml).join(' + ')}</div>` : ''}
+              ${a.why_unserved ? `<div><span class="dim">Why unserved:</span> ${escapeHtml(a.why_unserved)}</div>` : ''}</div>`,
+              actions: `<div class="niche-actions">${saved.has(a.name.toLowerCase()) ? '<span class="itag on">on your board</span>' : `<button class="curated-collapse-btn" data-asave="${i}">+ Add to board</button>`}</div>` })).join('')}</div>` : ''}
+          ${an.gaps.length ? `<div class="hsub">Gaps inside the hot finds <span class="dim">· holes the current players leave open</span></div>
+          <div class="niche-signals">${an.gaps.map((g, i) => `<div class="adv-row"><div><b>${escapeHtml(g.gap)}</b>${g.seen_in.length ? `<span class="adv-reason">${g.seen_in.map(escapeHtml).join(', ')}</span>` : ''}
+            <small>${escapeHtml(g.how_to_use)}</small></div>
+            <div class="adv-actions"><button class="curated-collapse-btn" data-hgap="${i}">Score as idea</button></div></div>`).join('')}</div>` : ''}` : ''}
+      </div>`; })() : ''}
+
       <div class="isec"><div class="isec-h">Hot ideas to replicate (${items.length}${items.length !== all.length ? ` of ${all.length}` : ''})</div>
         <div class="niche-form">
           <input id="hQ" placeholder="Search hot finds…" value="${escapeAttr(hotView.q)}">
@@ -1889,6 +1915,33 @@
     const hq = el.querySelector('#hQ'); if (hq) { let t; hq.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { const pos = hq.selectionStart; setHV('q', hq.value); const n = el.querySelector('#hQ'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }, 250); }); }
     const hs = el.querySelector('#hSort'); if (hs) hs.addEventListener('change', () => setHV('sort', hs.value));
     [['hOverlap', 'onlyOverlap'], ['hOpen', 'openOnly'], ['hNew', 'onlyNew']].forEach(([id, k]) => { const c = el.querySelector('#' + id); if (c) c.addEventListener('change', () => setHV(k, c.checked)); });
+
+    const runAnalysis = async force => {
+      nicheBusy = 'analyze'; renderNiches(el);
+      try {
+        const board = loadNiches().map(n => ({ name: n.name, pitch: n.description || n.pitch || '', status: n.status }));
+        const d = await nicheApi('/api/niche/hot/analyze', { force, board });
+        if (d.analysis) { nicheHot.analysis = d.analysis; saveJSON(NICHE_HOT_KEY, nicheHot); }
+        nicheHot.analysisError = d.error || null;
+        showToast(d.note || (d.error ? 'Analysis failed: ' + d.error : d.running ? 'Analysis already running — check back in a minute' : `Found ${d.analysis.angles.length} blind angles, ${d.analysis.gaps.length} gaps`));
+      } catch (e) { showToast(`Analysis failed: ${e.message}`); }
+      nicheBusy = ''; if (activeLane === '__niche_hot__') rerender();
+    };
+    const ar = el.querySelector('#hAnalyzeRun'); if (ar) ar.addEventListener('click', () => runAnalysis(true));
+    el.querySelectorAll('[data-asave]').forEach(b => b.addEventListener('click', () => {
+      const a = nicheHot.analysis.angles[+b.getAttribute('data-asave')]; if (!a) return;
+      upsertNiche({ ...a, pastNote: `Blind angle (${a.angle_type})${a.built_from.length ? ' from ' + a.built_from.join(' + ') : ''}. ${a.why_unserved}` }, 'Blind angle');
+      showToast(`Added ${a.name} to your board`); rerender();
+    }));
+    el.querySelectorAll('[data-hgap]').forEach(b => b.addEventListener('click', () => {
+      const g = nicheHot.analysis.gaps[+b.getAttribute('data-hgap')];
+      nicheEvalDraft = { name: g.gap.slice(0, 80), description: `${g.how_to_use}${g.seen_in.length ? ' (gap seen in: ' + g.seen_in.join(', ') + ')' : ''}` };
+      selectLane('__niche_score__'); showToast('Turn the gap into a business name, then click Score it');
+    }));
+    el.querySelectorAll('[data-hfind]').forEach(b => b.addEventListener('click', () => { hotView = { ...hotView, q: b.getAttribute('data-hfind'), onlyNew: false, onlyOverlap: false, openOnly: false }; saveJSON(HOT_VIEW_KEY, hotView); rerender(); const g = el.querySelector('#hQ'); if (g) g.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
+    // First look with finds but no (or stale) analysis → run it once, non-forced (server dedupes)
+    const an = nicheHot && nicheHot.analysis, n = nicheHot && nicheHot.items ? nicheHot.items.length : 0;
+    if (n && nicheHot.aiOn !== false && !nicheBusy && !nicheHot.analyzing && !hotAutoAnalyzed && (!an || an.basedOn !== n)) { hotAutoAnalyzed = true; runAnalysis(false); }
     const hm = el.querySelector('#hMore'); if (hm) hm.addEventListener('click', () => { bizHotLimit += 30; rerender(); });
     const goMap = tags => { bizFilter = { ...bizFilter, tags, q: '', fits: false, status: 'open', scope: 'hot', sort: 'overlap' }; saveBizFilter(); selectLane('__niche_map__'); };
     const ha = el.querySelector('#hAnalyze'); if (ha) ha.addEventListener('click', () => goMap([]));

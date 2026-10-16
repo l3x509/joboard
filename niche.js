@@ -220,9 +220,9 @@ const DEFAULT_AREA = 'South Shore Massachusetts (Randolph, Brockton, Quincy, Wey
 const HOT_FILE = path.join(process.env.DATA_DIR || os.tmpdir(), 'opsboard-hot-ideas.json');
 const HOT_MIN_FORCE_MS = 60 * 60 * 1000; // manual "scan now" at most once an hour (cost guard)
 
-let hot = { at: 0, area: DEFAULT_AREA, items: [], showhn: [], running: false, lastError: null, nextAt: 0 };
-try { const saved = JSON.parse(fs.readFileSync(HOT_FILE, 'utf8')); hot = { ...hot, ...saved, running: false }; } catch (_) {}
-function saveHot() { try { fs.writeFileSync(HOT_FILE, JSON.stringify({ ...hot, running: false })); } catch (e) { console.error('hot save', e.message); } }
+let hot = { at: 0, area: DEFAULT_AREA, items: [], showhn: [], running: false, lastError: null, nextAt: 0, analysis: null, analyzing: false, analysisError: null, board: [] };
+try { const saved = JSON.parse(fs.readFileSync(HOT_FILE, 'utf8')); hot = { ...hot, ...saved, running: false, analyzing: false }; } catch (_) {}
+function saveHot() { try { fs.writeFileSync(HOT_FILE, JSON.stringify({ ...hot, running: false, analyzing: false })); } catch (e) { console.error('hot save', e.message); } }
 
 function cleanHot(n) {
   const base = cleanNiche(n); if (!base) return null;
@@ -264,10 +264,68 @@ Return a JSON array of 8 niche objects with these EXTRA fields: "where": "where 
   } catch (e) { hot.lastError = e.message; console.error('hot scan', e.message); }
   try { hot.showhn = await showHn(); } catch (e) { console.error('showhn', e.message); }
   hot.running = false; saveHot();
+  if (!hot.lastError) analyzeHot(callScout).catch(e => console.error('auto analyze', e.message)); // patterns refresh after every new scan
   return hot;
 }
 
-function hotStatus() { return { ...hot, scanEveryHours: hotHours(), file: undefined }; }
+// ---------------------------------------------------------------------------
+// Pattern analysis over ALL hot finds: overlap clusters, blind angles, gaps
+// ---------------------------------------------------------------------------
+// Runs after every successful scan (and on demand). Uses the latest snapshot of
+// his board that the dashboard sent, so angles avoid what he already has.
+const ANALYZE_MIN_FORCE_MS = 60 * 60 * 1000;
+const ANGLE_TYPES = ['picks and shovels', 'B2B version', 'combination', 'local version', 'underserved segment', 'missing feature', 'other'];
+
+function cleanAnalysis(raw, hotNames) {
+  const str = (v, m) => String(v || '').slice(0, m);
+  const names = new Set(hotNames.map(n => n.toLowerCase()));
+  const keepNames = arr => (Array.isArray(arr) ? arr : []).map(x => str(x, 100)).filter(x => names.has(x.toLowerCase())).slice(0, 12);
+  const clusters = (Array.isArray(raw.clusters) ? raw.clusters : []).map(c => ({ name: str(c.name, 80), pattern: str(c.pattern, 300), why_now: str(c.why_now, 300), members: keepNames(c.members) }))
+    .filter(c => c.name && c.members.length >= 2).slice(0, 8);
+  const angles = (Array.isArray(raw.blind_angles) ? raw.blind_angles : []).map(a => {
+    const base = cleanNiche(a); if (!base) return null;
+    const t = str(a.angle_type, 40).toLowerCase();
+    return { ...base, angle_type: ANGLE_TYPES.includes(t) ? t : 'other', built_from: (Array.isArray(a.built_from) ? a.built_from : []).map(x => str(x, 100)).slice(0, 4), why_unserved: str(a.why_unserved, 300) };
+  }).filter(Boolean).sort((a, b) => b.total - a.total).slice(0, 8);
+  const gaps = (Array.isArray(raw.gaps) ? raw.gaps : []).map(g => ({ gap: str(g.gap, 200), seen_in: (Array.isArray(g.seen_in) ? g.seen_in : []).map(x => str(x, 100)).slice(0, 4), how_to_use: str(g.how_to_use, 300) }))
+    .filter(g => g.gap).slice(0, 10);
+  return { clusters, angles, gaps };
+}
+
+async function analyzeHot(callScout, { force = false, board } = {}) {
+  if (Array.isArray(board)) hot.board = board.slice(0, 80).map(b => ({ name: String(b.name || '').slice(0, 80), pitch: String(b.pitch || '').slice(0, 160), status: String(b.status || '').slice(0, 20) }));
+  const a = hot.analysis;
+  if (hot.analyzing) return { analysis: a, running: true };
+  if (!hot.items.length) return { analysis: a, note: 'No hot finds to analyze yet — run a scan first.' };
+  if (a && !force && a.basedOn === hot.items.length) return { analysis: a };
+  if (a && force && Date.now() - a.at < ANALYZE_MIN_FORCE_MS && a.basedOn === hot.items.length) return { analysis: a, note: 'Analyzed less than an hour ago with the same finds — showing that.' };
+  hot.analyzing = true;
+  try {
+    const finds = hot.items.slice(0, 150).map(i => `- ${i.name} [${i.type}] — ${i.pitch} | where: ${i.where || '?'} | hot: ${i.why_hot || '?'} | local: ${i.local_gap || '?'} | local competitors: ${(i.local_competitors || []).join(', ') || 'none found'}`).join('\n');
+    const mine = (hot.board || []).filter(b => b.status !== 'Killed').map(b => `- ${b.name}: ${b.pitch}`).join('\n') || '(none sent)';
+    const ask = `Here are ALL the hot business finds my scanner has collected (${hot.items.length}):
+${finds}
+
+My own idea board (don't repeat these as new angles; build on them where it helps):
+${mine}
+
+Analyze the finds as a set, not one by one:
+1. "clusters": groups of 2+ finds that are really the same underlying pattern (same buyer pain, same mechanism or same trend). Use the exact find names in "members". Say what the pattern is and why it is happening now.
+2. "blind_angles": up to 6 businesses that NONE of the finds or my ideas already are, but that the patterns point to. Look for: picks-and-shovels (sell to the operators riding a trend), the B2B version of a consumer find (or vice versa), a combination of two finds, a local version for ${hot.area || DEFAULT_AREA}, an ignored customer segment, a feature every player is missing. Search the web to check each one is actually unserved or weakly served and cite it. Score each with the normal niche fields and scoring, plus "angle_type" (one of: ${ANGLE_TYPES.join(', ')}), "built_from" (find names it comes from), "why_unserved" (1 sentence).
+3. "gaps": specific holes inside the hot finds — complaints about the leaders, missing features, price points nobody offers, regions or segments not covered. Each: "gap", "seen_in" (find names), "how_to_use" (1 sentence on how I could exploit it with my constraints).
+Return ONLY raw JSON: {"clusters":[{"name","pattern","why_now","members":[...]}],"blind_angles":[niche objects with the extra fields],"gaps":[{"gap","seen_in":[...],"how_to_use"}]}`;
+    const raw = await callScout([{ role: 'user', content: ask }], 9000, 12, NICHE_SYSTEM_PROMPT);
+    const parsed = extractJson(raw);
+    const clean = cleanAnalysis(Array.isArray(parsed) ? {} : parsed, hot.items.map(i => i.name));
+    if (!clean.clusters.length && !clean.angles.length && !clean.gaps.length) throw new Error('Analysis came back empty');
+    hot.analysis = { ...clean, at: Date.now(), basedOn: hot.items.length };
+    hot.analysisError = null;
+  } catch (e) { hot.analysisError = e.message; console.error('hot analyze', e.message); }
+  hot.analyzing = false; saveHot();
+  return { analysis: hot.analysis, error: hot.analysisError };
+}
+
+function hotStatus() { return { ...hot, board: undefined, scanEveryHours: hotHours() }; }
 function hotHours() { const h = Number(process.env.HOT_SCAN_HOURS ?? 24); return isFinite(h) && h >= 0 ? h : 24; }
 
 async function hotRequest(callScout, { area, force, hasKey }) {
@@ -297,5 +355,5 @@ function startHotScanner(callScout, hasKey) {
   setInterval(check, 15 * 60 * 1000).unref();
 }
 
-module.exports = { discover, evaluate, signals, cleanNiche, extractJson, NICHE_SYSTEM_PROMPT, hotRequest, startHotScanner, scanHot, DEFAULT_AREA };
+module.exports = { discover, evaluate, signals, cleanNiche, extractJson, NICHE_SYSTEM_PROMPT, hotRequest, startHotScanner, scanHot, analyzeHot, DEFAULT_AREA };
 

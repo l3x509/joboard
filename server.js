@@ -406,6 +406,12 @@ app.get('/api/niche/hot', async (req, res) => {
   try { res.json(await niche.hotRequest(callScout, { area: String(req.query.area || '').slice(0, 160), force: req.query.refresh === 'true', hasKey: !!ANTHROPIC_API_KEY })); }
   catch (e) { res.status(502).json({ error: e.message }); }
 });
+// Pattern analysis over all hot finds (clusters, blind angles, gaps). Body: { board: [{name,pitch,status}], force }
+app.post('/api/niche/hot/analyze', async (req, res) => {
+  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on the server — add it in Railway → Variables.' });
+  try { res.json(await niche.analyzeHot(callScout, { force: req.body.force === true, board: req.body.board })); }
+  catch (e) { res.status(502).json({ error: e.message }); }
+});
 niche.startHotScanner(callScout, !!ANTHROPIC_API_KEY);
 
 app.listen(PORT, () => {
