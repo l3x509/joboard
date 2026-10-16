@@ -75,7 +75,18 @@ function cleanNiche(n) {
   };
 }
 
-const researchCache = new Map(); // key -> { at, items }
+// Paid results are remembered on disk (DATA_DIR) so repeats and redeploys don't pay twice.
+const CACHE_FILE = require('path').join(process.env.DATA_DIR || require('os').tmpdir(), 'opsboard-ai-cache.json');
+const SCORE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+let aiCache = { research: {}, scores: {} };
+try { aiCache = { ...aiCache, ...JSON.parse(require('fs').readFileSync(CACHE_FILE, 'utf8')) }; } catch (_) {}
+function saveCache() {
+  const now = Date.now();
+  Object.entries(aiCache.research).forEach(([k, v]) => { if (now - v.at > RESEARCH_TTL_MS) delete aiCache.research[k]; });
+  Object.entries(aiCache.scores).forEach(([k, v]) => { if (now - v.at > SCORE_TTL_MS) delete aiCache.scores[k]; });
+  try { require('fs').writeFileSync(CACHE_FILE, JSON.stringify(aiCache)); } catch (e) { console.error('cache save', e.message); }
+}
+const researchCache = { get: k => aiCache.research[k], set: (k, v) => { aiCache.research[k] = v; saveCache(); } };
 
 async function discover(_unused, focus, force) {
   const key = 'discover:' + (focus || '').toLowerCase().trim();
@@ -90,14 +101,19 @@ async function discover(_unused, focus, force) {
   return { items, fromCache: false, at: Date.now() };
 }
 
-async function evaluate(_unused, idea) {
+async function evaluate(_unused, idea, { force = false } = {}) {
   const name = String(idea.name || '').slice(0, 120), desc = String(idea.description || '').slice(0, 1200);
   if (name.length < 2) throw new Error('idea name required');
+  const norm = t => t.toLowerCase().replace(/\s+/g, ' ').trim();
+  const key = norm(name) + '|' + norm(desc);
+  const hit = aiCache.scores[key];
+  if (!force && hit && Date.now() - hit.at < SCORE_TTL_MS) return { ...hit.item, fromCache: true, scoredAt: hit.at };
   const ask = `Evaluate this business idea of mine honestly: "${name}"${desc ? ` — ${desc}` : ''}. Search the web for demand evidence and competitors. If it's weak, say so with low scores and suggest a sharper variant in "pitch". Return ONE niche JSON object.`;
   const raw = await ai({ system: NICHE_SYSTEM_PROMPT, ask, maxTokens: 2500, searches: 3, purpose: 'Score an idea' }); // ~$0.04
   const parsed = extractJson(raw);
   const item = cleanNiche(Array.isArray(parsed) ? parsed[0] : parsed);
   if (!item) throw new Error('Evaluation did not return a niche');
+  aiCache.scores[key] = { at: Date.now(), item }; saveCache();
   return item;
 }
 
@@ -351,9 +367,10 @@ ${shape}. "evidence" must be [{"claim": "...", "url": "<the item's exact URL fro
 }
 
 // "Check my area" for one hot find: 2 web searches (~$0.025)
-async function checkLocal(name, { auto = false } = {}) {
+async function checkLocal(name, { auto = false, force = false } = {}) {
   const it = hot.items.find(i => i.name.toLowerCase() === String(name || '').toLowerCase());
   if (!it) throw new Error('That hot find is no longer in the list');
+  if (!force && it.local_checked && it.localCheckedAt && Date.now() - new Date(it.localCheckedAt) < 30 * 86400000) return it; // already checked this month: free
   const where = hot.area || DEFAULT_AREA;
   const ask = `Check whether ${where} already has this business: "${it.name}" — ${it.pitch}. Use at most 2 searches (e.g. "<service> near Brockton MA", "<service> South Shore MA"). Return ONLY JSON: {"local_competitors": ["names actually found, max 4"], "local_gap": "1 sentence: is there an opening here and why", "evidence": [{"claim": "...", "url": "https://..."}]}`;
   const raw = await ai({ system: NICHE_SYSTEM_PROMPT, ask, maxTokens: 800, searches: 2, auto, purpose: 'Check my area' });

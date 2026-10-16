@@ -324,8 +324,11 @@ async function callScout(messages, maxTokens, maxSearches, system = SCOUT_SYSTEM
     body: JSON.stringify({
       model: 'claude-sonnet-5',
       max_tokens: maxTokens,
-      system,
-      messages,
+      // Prompt caching: the long Scout instructions + the conversation so far are reused
+      // across back-to-back chat messages at 10% of the input price.
+      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+      messages: messages.map((m, i) => i === messages.length - 1 && typeof m.content === 'string'
+        ? { role: m.role, content: [{ type: 'text', text: m.content, cache_control: { type: 'ephemeral' } }] } : m),
       tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxSearches }],
     }),
   });
@@ -394,7 +397,7 @@ app.post('/api/niche/discover', async (req, res) => {
   catch (e) { bizErr(res, e); }
 });
 app.post('/api/niche/evaluate', async (req, res) => {
-  try { res.json({ item: await niche.evaluate(null, req.body.idea || {}) }); }
+  try { const item = await niche.evaluate(null, req.body.idea || {}, { force: req.body.force === true }); res.json({ item, fromCache: !!item.fromCache }); }
   catch (e) { bizErr(res, e); }
 });
 // Free live signals: Hacker News always; Reddit / YouTube only when their keys are set.

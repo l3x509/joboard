@@ -59,7 +59,9 @@ async function ai({ system, ask, maxTokens = 3000, searches = 0, auto = false, p
       ? `Automatic ${purpose} skipped: automatic jobs have used $${state.spent.toFixed(2)} of their $${cap.toFixed(2)} monthly share.`
       : `Monthly AI budget reached ($${state.spent.toFixed(2)} of $${BUDGET.toFixed(2)}). Raise BIZ_MONTHLY_BUDGET in Railway or wait until ${nextMonthLabel()}.`);
   }
-  const body = { model: MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content: ask }] };
+  // Prompt caching: the instructions are identical on every call, so mark them cacheable.
+  // Back-to-back clicks within 5 minutes read them at 10% of the input price.
+  const body = { model: MODEL, max_tokens: maxTokens, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: ask }] };
   if (searches > 0) body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: searches }];
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST', timeout: 180000,

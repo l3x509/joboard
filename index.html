@@ -1679,7 +1679,7 @@
   function shortlistActions(n) {
     return `<div class="niche-actions">
       <select data-nsel="${n.id}" aria-label="Status for ${escapeAttr(n.name)}">${NICHE_STATUSES.filter(s => s !== 'Testing' && s !== 'Building').concat(['Testing', 'Building'].includes(n.status) ? [n.status] : []).map(s => `<option ${s === n.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
-      ${typeof n.total !== 'number' ? `<button class="curated-collapse-btn" data-nscore="${n.id}" ${nicheBusy ? 'disabled' : ''} title="Haiku + 3 web searches, about $0.04">Score it</button>` : ''}
+      ${typeof n.total !== 'number' ? `<button class="curated-collapse-btn" data-nscore="${n.id}" ${nicheBusy ? 'disabled' : ''} title="Haiku + 3 web searches, about $0.04. Scores are remembered for 7 days, so asking again is free.">Score it</button>` : `<button class="curated-collapse-btn" data-nscore="${n.id}" data-force="1" ${nicheBusy ? 'disabled' : ''} title="Fresh research, ignores the saved score">Re-score (~$0.04)</button>`}
       ${!['Killed', 'Won', 'Testing', 'Building'].includes(n.status) ? `<button class="curated-collapse-btn" data-nstart="${n.id}">▶ Start 2-week test</button>` : ''}
       <button class="curated-collapse-btn" data-ndel="${n.id}">Delete</button>
     </div>`;
@@ -2154,7 +2154,7 @@
     el.querySelectorAll('[data-nscore]').forEach(b => b.addEventListener('click', async () => {
       const n = loadNiches().find(x => x.id === b.getAttribute('data-nscore')); if (!n) return;
       nicheBusy = 'evaluate'; renderNiches(el);
-      try { const { item } = await nicheApi('/api/niche/evaluate', { idea: { name: n.name, description: n.description || n.pitch || '' } }); upsertNiche({ ...item, name: n.name, suggested: item.pitch, pitch: n.description || n.pitch || item.pitch }, n.source); showToast(`${n.name}: ${item.total}/100`); refreshBudget(); }
+      try { const { item, fromCache } = await nicheApi('/api/niche/evaluate', { idea: { name: n.name, description: n.description || n.pitch || '' }, force: b.getAttribute('data-force') === '1' }); upsertNiche({ ...item, name: n.name, suggested: item.pitch, pitch: n.description || n.pitch || item.pitch }, n.source); showToast(`${n.name}: ${item.total}/100${fromCache ? ' (saved score, free)' : ''}`); refreshBudget(); }
       catch (e) { showToast(`Scoring failed: ${e.message}`); }
       nicheBusy = ''; rerender();
     }));
@@ -2169,7 +2169,7 @@
       nicheEvalDraft = { name: el.querySelector('#nEvalName').value.trim(), description: el.querySelector('#nEvalDesc').value.trim() };
       if (nicheEvalDraft.name.length < 2) { showToast('Give the idea a name first'); return; }
       nicheBusy = 'evaluate'; renderNiches(el);
-      try { const { item } = await nicheApi('/api/niche/evaluate', { idea: nicheEvalDraft }); upsertNiche({ ...item, name: nicheEvalDraft.name, description: nicheEvalDraft.description, suggested: item.pitch, pitch: nicheEvalDraft.description || item.pitch }, 'Your idea'); showToast(`${nicheEvalDraft.name}: ${item.total}/100 — saved to shortlist`); refreshBudget(); nicheEvalDraft = { name: '', description: '' }; }
+      try { const { item, fromCache } = await nicheApi('/api/niche/evaluate', { idea: nicheEvalDraft }); upsertNiche({ ...item, name: nicheEvalDraft.name, description: nicheEvalDraft.description, suggested: item.pitch, pitch: nicheEvalDraft.description || item.pitch }, 'Your idea'); showToast(`${nicheEvalDraft.name}: ${item.total}/100${fromCache ? ' (saved score, free)' : ''} — saved to shortlist`); refreshBudget(); nicheEvalDraft = { name: '', description: '' }; }
       catch (e) { showToast(`Scoring failed: ${e.message}`); }
       nicheBusy = ''; rerender();
     });
