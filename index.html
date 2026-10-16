@@ -1604,8 +1604,27 @@
     'Browser extension': 'Distributed through the Chrome Web Store; small build, store review required.',
   };
   const BIZ_FILTER_KEY = 'biz-filter-v1';
-  let bizFilter = Object.assign({ tags: [], q: '', status: 'open', sort: 'score', fits: false }, loadJSON(BIZ_FILTER_KEY, {}));
-  const saveBizFilter = () => saveJSON(BIZ_FILTER_KEY, bizFilter);
+  let bizFilter = Object.assign({ tags: [], q: '', status: 'open', sort: 'score', fits: false, scope: 'both' }, loadJSON(BIZ_FILTER_KEY, {}));
+  // Hot finds as analyzable ideas (skips ones already on the board)
+  function hotAsIdeas(list) {
+    const onBoard = new Set(list.map(n => n.name.toLowerCase()));
+    return ((nicheHot && nicheHot.items) || []).filter(h => !onBoard.has(h.name.toLowerCase())).map(h => ({ ...h, id: 'hot:' + h.name, source: 'Hot scan', status: 'Hot', isHot: true }));
+  }
+  const coreTags = n => flatTags(nicheTags(n)).filter(k => !k.startsWith('fit:'));
+  // Board ideas sharing 2+ build/model/buyer tags with an idea, best first
+  function boardMatches(n, board) {
+    const a = coreTags(n);
+    return board.filter(b => b.id !== n.id && b.status !== 'Killed').map(b => { const bs = new Set(coreTags(b)); const common = a.filter(k => bs.has(k)); return { idea: b, common, build: common.some(k => k.startsWith('build:')) }; })
+      .filter(m => m.common.length >= 2).sort((x, y) => (y.build - x.build) || y.common.length - x.common.length || (y.idea.total ?? -1) - (x.idea.total ?? -1));
+  }
+  function saveHotIdea(name) {
+    const n = ((nicheHot && nicheHot.items) || []).find(x => x.name === name); if (!n) return;
+    const pitch = [n.pitch, n.local_gap].filter(Boolean).join(' ');
+    upsertNiche({ ...n, pitch, description: n.pitch, pastNote: n.why_hot ? `Hot in ${n.where || 'elsewhere'}: ${n.why_hot}` : '' }, 'Hot scan');
+    showToast(`Added ${n.name} to your board`);
+  }
+  const saveBizFilter = () => { bizMapLimit = 30; bizHotLimit = 30; saveJSON(BIZ_FILTER_KEY, bizFilter); };
+  let bizMapLimit = 30, bizHotLimit = 30;
 
   function nicheTags(n) {
     const out = { build: [], model: [], buyer: [], fit: [] };
@@ -1655,8 +1674,13 @@
     </div>`;
   }
 
-  function bizMapHtml(list) {
+  function bizMapHtml(board) {
+    const hotIdeas = hotAsIdeas(board);
+    const list = bizFilter.scope === 'board' ? board : bizFilter.scope === 'hot' ? hotIdeas : [...board, ...hotIdeas];
     const shown = bizSort(bizFiltered(list));
+    const hotShown = shown.filter(n => n.isHot);
+    const hotLinks = bizFilter.scope !== 'board' ? hotShown.map(h => ({ h, m: boardMatches(h, board) })).filter(x => x.m.length).sort((a, b) => (b.m[0].build - a.m[0].build) || b.m[0].common.length - a.m[0].common.length || b.h.total - a.h.total) : [];
+    const nm = n => `${n.isHot ? '▲ ' : ''}${escapeHtml(n.name)}`;
     const scored = shown.filter(n => typeof n.total === 'number');
     const tagsOf = new Map(shown.map(n => [n.id, nicheTags(n)]));
     const countIn = (arr, dim, t) => arr.filter(n => nicheTags(n)[dim].includes(t)).length;
@@ -1664,7 +1688,7 @@
     const fitN = shown.filter(n => fitsConstraints(tagsOf.get(n.id))).length;
     const reuseN = shown.filter(n => tagsOf.get(n.id).fit.includes('Reuses your code')).length;
     const localN = shown.filter(n => tagsOf.get(n.id).fit.includes('Local area')).length;
-    const active = bizFilter.tags.length || bizFilter.q || bizFilter.fits || bizFilter.status !== 'open';
+    const active = bizFilter.tags.length || bizFilter.q || bizFilter.fits || bizFilter.status !== 'open' || bizFilter.scope !== 'both';
 
     // Pairs that share the most build/model/buyer tags → merge candidates
     const pairs = [];
@@ -1688,6 +1712,7 @@
       <div class="bfilter">
         <div class="niche-form">
           <input id="bQ" placeholder="Search ideas…" value="${escapeAttr(bizFilter.q)}">
+          <select id="bScope" class="bsel"><option value="both" ${bizFilter.scope === 'both' ? 'selected' : ''}>My board + hot finds (${board.length + hotIdeas.length})</option><option value="board" ${bizFilter.scope === 'board' ? 'selected' : ''}>My board only (${board.length})</option><option value="hot" ${bizFilter.scope === 'hot' ? 'selected' : ''}>Hot finds only (${hotIdeas.length})</option></select>
           <select id="bStatus" class="bsel"><option value="open" ${bizFilter.status === 'open' ? 'selected' : ''}>Open ideas (hide parked/killed)</option><option value="all" ${bizFilter.status === 'all' ? 'selected' : ''}>All ideas</option></select>
           <select id="bSort" class="bsel"><option value="score" ${bizFilter.sort === 'score' ? 'selected' : ''}>Sort: best score</option><option value="overlap" ${bizFilter.sort === 'overlap' ? 'selected' : ''}>Sort: most overlap</option><option value="name" ${bizFilter.sort === 'name' ? 'selected' : ''}>Sort: name</option></select>
           <label class="bcheck"><input type="checkbox" id="bFits" ${bizFilter.fits ? 'checked' : ''}> Fits my constraints <span class="dim">(no in-person, no outreach)</span></label>
@@ -1698,7 +1723,7 @@
       </div>
 
       <div class="isec"><div class="ikpis">
-        <div class="ik accent"><div class="ik-v">${shown.length}<small>/${list.length}</small></div><div class="ik-l">ideas in this view</div></div>
+        <div class="ik accent"><div class="ik-v">${shown.length}<small>/${list.length}</small></div><div class="ik-l">ideas in this view</div>${bizFilter.scope !== 'board' ? `<div class="ik-n">${hotShown.length} hot finds (▲)</div>` : ''}</div>
         <div class="ik"><div class="ik-v">${scored.length ? Math.round(scored.reduce((s, n) => s + n.total, 0) / scored.length) : '—'}</div><div class="ik-l">average score</div><div class="ik-n">${scored.length} of ${shown.length} scored</div></div>
         <div class="ik ${builds[0] && builds[0].ideas.length > 2 ? 'good' : ''}"><div class="ik-v">${builds[0] ? builds[0].ideas.length : 0}</div><div class="ik-l">share one build</div><div class="ik-n">${builds[0] ? escapeHtml(builds[0].t) : '—'}</div></div>
         <div class="ik ${fitN ? 'good' : 'warn'}"><div class="ik-v">${fitN}</div><div class="ik-l">fit your constraints</div><div class="ik-n">online, inbound, no outreach</div></div>
@@ -1709,10 +1734,10 @@
       <div class="isec"><div class="isec-h">Build once, test many <span class="isec-sub">ideas that could run on the same codebase · click to filter</span></div>
         <div class="incs">${builds.map(b => { const sc = b.ideas.filter(n => typeof n.total === 'number'); const best = sc.sort((x, y) => y.total - x.total)[0]; const re = b.ideas.filter(n => tagsOf.get(n.id).fit.includes('Reuses your code'));
           return `<div class="inc ${bizFilter.tags.includes('build:' + b.t) ? 'on' : ''}"><div class="inc-h">${escapeHtml(b.t)} <span>· ${b.ideas.length} idea${b.ideas.length > 1 ? 's' : ''}</span></div>
-            <div class="inc-s">${b.ideas.map(n => escapeHtml(n.name)).join(' · ')}</div>
+            <div class="inc-s">${b.ideas.map(nm).join(' · ')}</div>${b.ideas.some(n => n.isHot) && b.ideas.some(n => !n.isHot) ? `<div class="inc-t">${b.ideas.filter(n => n.isHot).length} hot find(s) run on the same build as ${b.ideas.filter(n => !n.isHot).length} of your ideas</div>` : ''}
             ${re.length ? `<div class="inc-t">Head start: ${re.map(n => escapeHtml(n.name)).join(', ')}</div>` : ''}
             <div class="inc-p">${escapeHtml(BUILD_NOTES[b.t] || '')}</div>
-            <div class="inc-c">${best ? `Best score: <b>${escapeHtml(best.name)}</b> ${best.total}/100` : 'None scored yet'}</div>
+            <div class="inc-c">${best ? `Best score: <b>${nm(best)}</b> ${best.total}/100` : 'None scored yet'}</div>
             <button class="curated-collapse-btn" data-btag="${escapeAttr('build:' + b.t)}">${bizFilter.tags.includes('build:' + b.t) ? 'Remove filter' : 'Filter to these'}</button></div>`; }).join('') || '<div class="pane-empty">No ideas match.</div>'}</div>
       </div>
 
@@ -1727,11 +1752,20 @@
         <div><div class="isec-h">Fit flags</div>${bars('fit')}</div>
       </div>
 
-      ${pairs.length ? `<div class="isec"><div class="isec-h">Closest pairs <span class="isec-sub">ideas sharing 2+ build, model or buyer tags · merge candidates or one test for both</span></div>
-        <div class="bpairs">${pairs.slice(0, 8).map(p => `<div class="bpair"><b>${escapeHtml(p.a.name)}</b> <span class="dim">+</span> <b>${escapeHtml(p.b.name)}</b><div>${p.common.map(k => `<span class="itag lanes">${escapeHtml(k.split(':')[1])}</span>`).join(' ')}</div></div>`).join('')}</div></div>` : ''}
+      ${hotLinks.length ? `<div class="isec"><div class="isec-h">Hot finds that overlap your board (${hotLinks.length}) <span class="isec-sub">proven elsewhere + close to something you already planned · strongest first</span></div>
+        <div class="bpairs">${hotLinks.slice(0, 12).map(({ h, m }) => `<div class="bpair"><div style="justify-content:space-between"><b>▲ ${escapeHtml(h.name)}</b><span class="itag">${h.total}/100</span></div>
+          <div class="dim" style="font-size:12px">${escapeHtml(h.where ? 'Working in ' + h.where : '')}</div>
+          <div style="font-size:12px">↔ ${m.slice(0, 3).map(x => `<b>${escapeHtml(x.idea.name)}</b>`).join(', ')}${m.length > 3 ? ` +${m.length - 3} more` : ''}</div>
+          <div>${m[0].common.map(k => `<span class="itag lanes">${escapeHtml(k.split(':')[1])}</span>`).join(' ')}</div>
+          <div><button class="curated-collapse-btn" data-hsave="${escapeAttr(h.name)}">+ Add to board</button></div></div>`).join('')}</div>
+        ${hotLinks.length > 12 ? `<div class="inote">${hotLinks.length - 12} more below in Matching ideas (sort by "most overlap").</div>` : ''}</div>` : ''}
 
-      <div class="isec"><div class="isec-h">Matching ideas (${shown.length})</div>
-        ${shown.length ? `<div class="niche-grid">${shown.map(n => nicheCardHtml(n, { compact: true, tagsAll: true, actions: shortlistActions(n) })).join('')}</div>` : '<div class="pane-empty">No ideas match these filters.</div>'}
+      ${pairs.length ? `<div class="isec"><div class="isec-h">Closest pairs <span class="isec-sub">ideas sharing 2+ build, model or buyer tags · merge candidates or one test for both</span></div>
+        <div class="bpairs">${pairs.slice(0, 8).map(p => `<div class="bpair"><b>${nm(p.a)}</b> <span class="dim">+</span> <b>${nm(p.b)}</b><div>${p.common.map(k => `<span class="itag lanes">${escapeHtml(k.split(':')[1])}</span>`).join(' ')}</div></div>`).join('')}</div></div>` : ''}
+
+      <div class="isec"><div class="isec-h">Matching ideas (${shown.length}) <span class="isec-sub">▲ = hot find, not on your board yet</span></div>
+        ${shown.length ? `<div class="niche-grid">${shown.slice(0, bizMapLimit).map(n => nicheCardHtml(n, { compact: true, tagsAll: true, extra: n.isHot ? `<div class="hot-meta">${n.where ? `<div><span class="dim">Working in:</span> ${escapeHtml(n.where)}</div>` : ''}${n.local_gap ? `<div><span class="dim">Your area:</span> ${escapeHtml(n.local_gap)}</div>` : ''}</div>` : '', actions: n.isHot ? `<div class="niche-actions"><button class="curated-collapse-btn" data-hsave="${escapeAttr(n.name)}">+ Add to board</button></div>` : shortlistActions(n) })).join('')}</div>
+          ${shown.length > bizMapLimit ? `<button class="curated-collapse-btn" id="bMore" style="margin-top:10px">Show ${Math.min(30, shown.length - bizMapLimit)} more of ${shown.length - bizMapLimit}</button>` : ''}` : '<div class="pane-empty">No ideas match these filters.</div>'}
       </div>`;
   }
 
@@ -1749,7 +1783,10 @@
     const st = el.querySelector('#bStatus'); if (st) st.addEventListener('change', () => { bizFilter.status = st.value; saveBizFilter(); rerender(); });
     const so = el.querySelector('#bSort'); if (so) so.addEventListener('change', () => { bizFilter.sort = so.value; saveBizFilter(); rerender(); });
     const fi = el.querySelector('#bFits'); if (fi) fi.addEventListener('change', () => { bizFilter.fits = fi.checked; saveBizFilter(); rerender(); });
-    const cl = el.querySelector('#bClear'); if (cl) cl.addEventListener('click', () => { bizFilter = { tags: [], q: '', status: 'open', sort: bizFilter.sort, fits: false }; saveBizFilter(); rerender(); });
+    const cl = el.querySelector('#bClear'); if (cl) cl.addEventListener('click', () => { bizFilter = { tags: [], q: '', status: 'open', sort: bizFilter.sort, fits: false, scope: 'both' }; saveBizFilter(); rerender(); });
+    const sc = el.querySelector('#bScope'); if (sc) sc.addEventListener('change', () => { bizFilter.scope = sc.value; saveBizFilter(); rerender(); });
+    const mo = el.querySelector('#bMore'); if (mo) mo.addEventListener('click', () => { bizMapLimit += 30; rerender(); });
+    el.querySelectorAll('[data-hsave]').forEach(b => b.addEventListener('click', () => { saveHotIdea(b.getAttribute('data-hsave')); rerender(); }));
   }
 
   // ===== Hot ideas to replicate locally (server scans the web on a timer) =====
@@ -1757,6 +1794,8 @@
   const NICHE_HOT_VISIT_KEY = 'niche-hot-visit-v1';
   let nicheHot = loadJSON(NICHE_HOT_KEY, null);
   let nicheHotFetched = 0;
+  const HOT_VIEW_KEY = 'hot-view-v1';
+  let hotView = Object.assign({ q: '', sort: 'new', onlyOverlap: false, openOnly: false, onlyNew: false }, loadJSON(HOT_VIEW_KEY, {}));
   let hotVisitPrev = null;   // last visit before this session's first look — 'new' is relative to it
   let hotBgFetch = false;
   const hotNewCount = () => { const v = loadJSON(NICHE_HOT_VISIT_KEY, ''); return nicheHot && nicheHot.items ? nicheHot.items.filter(i => !v || (i.firstSeen || '') > v).length : 0; };
@@ -1774,17 +1813,48 @@
     // which of his shared builds each hot idea would plug into
     const buildCounts = {}; list.filter(n => !['Killed'].includes(n.status)).forEach(n => nicheTags(n).build.forEach(t => buildCounts[t] = (buildCounts[t] || 0) + 1));
     const fmt = ms => ms ? new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
-    const items = h && h.items ? [...h.items].sort((a, b) => ((b.firstSeen || '') > visit) - ((a.firstSeen || '') > visit) || b.total - a.total) : [];
+    const board = list.filter(n => n.status !== 'Killed');
+    const all = h && h.items ? h.items.map(n => ({ ...n, _new: (n.firstSeen || '') > visit, _m: boardMatches(n, board) })) : [];
+    const q = hotView.q.trim().toLowerCase();
+    let items = all.filter(n => (!q || `${n.name} ${n.pitch} ${n.where} ${n.why_hot} ${n.local_gap}`.toLowerCase().includes(q)) && (!hotView.onlyOverlap || n._m.length) && (!hotView.onlyNew || n._new) && (!hotView.openOnly || !(n.local_competitors || []).length));
+    const sorters = { new: (a, b) => (b._new - a._new) || (b.firstSeen || '').localeCompare(a.firstSeen || '') || b.total - a.total, score: (a, b) => b.total - a.total, overlap: (a, b) => (b._m.length ? b._m[0].common.length : 0) - (a._m.length ? a._m[0].common.length : 0) || b._m.length - a._m.length || b.total - a.total };
+    items.sort(sorters[hotView.sort] || sorters.new);
+    // Overlap summary across ALL hot finds
+    const buildRows = BIZ_DIMS[0].tags.map(([t]) => [t, all.filter(n => nicheTags(n).build.includes(t)).length, buildCounts[t] || 0]).filter(r => r[1]).sort((a, b) => b[1] - a[1]);
+    const bmax = Math.max(1, ...buildRows.map(r => r[1]));
+    const linked = all.filter(n => n._m.length);
+    const openLocal = all.filter(n => !(n.local_competitors || []).length).length;
     return `
       <div class="niche-form">
         <input id="hArea" placeholder="Area to replicate in" value="${escapeAttr(h && h.area || 'South Shore Massachusetts and greater Boston')}" style="flex:2">
         <button class="tb-btn primary" id="hScan" ${nicheBusy ? 'disabled' : ''}>${nicheBusy === 'hot' ? 'Scanning the web… (1–2 minutes)' : 'Scan now'}</button>
       </div>
-      <div class="niche-sub">${h ? `${h.aiOn === false ? '<b class="warn">Web scanning is off: ANTHROPIC_API_KEY is not set on the server.</b> ' : ''}${h.scanEveryHours ? `Auto-scans every ${h.scanEveryHours} h on the server` : 'Auto-scan is off (HOT_SCAN_HOURS=0)'} · last scan ${fmt(h.at)}${h.nextAt && h.scanEveryHours ? ` · next about ${fmt(h.nextAt)}` : ''} · keeps the last 40 finds${h.running ? ' · <b>scan running now</b>' : ''}${h.note ? ` · ${escapeHtml(h.note)}` : ''}${h.lastError ? `<br><span class="warn">Last scan failed: ${escapeHtml(h.lastError)}</span>` : ''}` : 'Loading…'}</div>
+      <div class="niche-sub">${h ? `${h.aiOn === false ? '<b class="warn">Web scanning is off: ANTHROPIC_API_KEY is not set on the server.</b> ' : ''}${h.scanEveryHours ? `Auto-scans every ${h.scanEveryHours} h on the server` : 'Auto-scan is off (HOT_SCAN_HOURS=0)'} · last scan ${fmt(h.at)}${h.nextAt && h.scanEveryHours ? ` · next about ${fmt(h.nextAt)}` : ''} · keeps every find${h.running ? ' · <b>scan running now</b>' : ''}${h.note ? ` · ${escapeHtml(h.note)}` : ''}${h.lastError ? `<br><span class="warn">Last scan failed: ${escapeHtml(h.lastError)}</span>` : ''}` : 'Loading…'}</div>
 
-      <div class="isec"><div class="isec-h">Hot ideas to replicate (${items.length}) <span class="isec-sub">working somewhere else, checked against your area · new since your last visit first</span></div>
-        ${items.length ? `<div class="niche-grid">${items.map((n, i) => {
-          const isNew = (n.firstSeen || '') > visit; const tg = nicheTags(n);
+      ${all.length ? `<div class="isec"><div class="ikpis">
+        <div class="ik accent"><div class="ik-v">${all.length}</div><div class="ik-l">hot finds kept</div><div class="ik-n">${all.filter(n => n._new).length} new since last visit</div></div>
+        <div class="ik ${linked.length ? 'good' : ''}"><div class="ik-v">${linked.length}</div><div class="ik-l">overlap your board</div><div class="ik-n">share 2+ build, model or buyer tags</div></div>
+        <div class="ik"><div class="ik-v">${openLocal}</div><div class="ik-l">no local competitor found</div></div>
+        <div class="ik"><div class="ik-v">${all.filter(n => fitsConstraints(nicheTags(n))).length}</div><div class="ik-l">fit your constraints</div></div>
+      </div></div>
+      <div class="isec igrid">
+        <div><div class="isec-h">Hot finds by shared build <span class="isec-sub">bar = hot finds · right = your ideas on the same build</span></div>
+          ${buildRows.map(([t, c, mine]) => `<div class="ib" data-hbuild="${escapeAttr(t)}" role="button" tabindex="0" style="cursor:pointer" title="Analyze these in Overlaps"><span class="ib-l">${escapeHtml(t)}</span><span class="ib-t"><span class="ib-f" style="width:${Math.round(100 * c / bmax)}%"></span></span><span class="ib-n">${c}</span><span class="ib-p">${mine ? `+${mine} of yours` : 'none of yours'}</span></div>`).join('')}</div>
+        <div><div class="isec-h">Strongest matches with your board</div>
+          ${linked.length ? `<ol class="imoves">${[...linked].sort(sorters.overlap).slice(0, 6).map(n => `<li><b>${escapeHtml(n.name)}</b> ↔ ${escapeHtml(n._m[0].idea.name)} <span class="dim">(${n._m[0].common.map(k => k.split(':')[1]).join(', ')})</span></li>`).join('')}</ol>` : '<div class="inote">No hot find overlaps your board yet.</div>'}
+          <button class="curated-collapse-btn" id="hAnalyze" style="margin-top:8px">Analyze all hot finds in Overlaps →</button></div>
+      </div>` : ''}
+
+      <div class="isec"><div class="isec-h">Hot ideas to replicate (${items.length}${items.length !== all.length ? ` of ${all.length}` : ''})</div>
+        <div class="niche-form">
+          <input id="hQ" placeholder="Search hot finds…" value="${escapeAttr(hotView.q)}">
+          <select id="hSort" class="bsel"><option value="new" ${hotView.sort === 'new' ? 'selected' : ''}>Sort: newest first</option><option value="score" ${hotView.sort === 'score' ? 'selected' : ''}>Sort: best score</option><option value="overlap" ${hotView.sort === 'overlap' ? 'selected' : ''}>Sort: most overlap with my board</option></select>
+          <label class="bcheck"><input type="checkbox" id="hOverlap" ${hotView.onlyOverlap ? 'checked' : ''}> Overlaps my board</label>
+          <label class="bcheck"><input type="checkbox" id="hOpen" ${hotView.openOnly ? 'checked' : ''}> No local competitor</label>
+          <label class="bcheck"><input type="checkbox" id="hNew" ${hotView.onlyNew ? 'checked' : ''}> New only</label>
+        </div>
+        ${items.length ? `<div class="niche-grid">${items.slice(0, bizHotLimit).map((n, i) => {
+          const isNew = n._new; const tg = nicheTags(n);
           const plugs = tg.build.filter(t => buildCounts[t]);
           return nicheCardHtml({ ...n, source: isNew ? 'New' : 'Hot scan' }, { compact: true, tagsAll: false, extra: `
             <div class="hot-meta">
@@ -1793,9 +1863,9 @@
               ${n.local_gap ? `<div><span class="dim">Your area:</span> ${escapeHtml(n.local_gap)}</div>` : ''}
               <div><span class="dim">Local competitors:</span> ${n.local_competitors && n.local_competitors.length ? n.local_competitors.map(c => `<span class="itag">${escapeHtml(c)}</span>`).join(' ') : '<span class="itag on">none found</span>'}</div>
               ${n.launch_cost ? `<div><span class="dim">Launch cost:</span> ${escapeHtml(n.launch_cost)}</div>` : ''}
-              ${plugs.length ? `<div class="inc-t">Shares a build with ${plugs.map(t => `${escapeHtml(t)} (${buildCounts[t]} of your ideas)`).join(', ')}</div>` : ''}
+              ${n._m.length ? `<div class="inc-t">Overlaps your ${n._m.slice(0, 2).map(x => escapeHtml(x.idea.name)).join(' and ')}${n._m.length > 2 ? ` +${n._m.length - 2}` : ''} (${n._m[0].common.map(k => escapeHtml(k.split(':')[1])).join(', ')})</div>` : plugs.length ? `<div class="inc-t">Shares a build with ${plugs.map(t => `${escapeHtml(t)} (${buildCounts[t]} of your ideas)`).join(', ')}</div>` : ''}
             </div>`, actions: `<div class="niche-actions">${saved.has(n.name.toLowerCase()) ? '<span class="itag on">on your board</span>' : `<button class="curated-collapse-btn" data-hsave="${escapeAttr(n.name)}">+ Add to board</button>`}<span class="dim" style="font-size:11px">${n.firstSeen ? postedAgoLabel(n.firstSeen).replace(/^Posted/, 'Found') : ''}</span></div>` });
-        }).join('')}</div>` : `<div class="pane-empty">${h && h.aiOn === false ? 'Add ANTHROPIC_API_KEY in Railway to turn on web scanning.' : 'No scan yet. Click <b>Scan now</b> or wait for the daily auto-scan.'}</div>`}
+        }).join('')}</div>${items.length > bizHotLimit ? `<button class="curated-collapse-btn" id="hMore" style="margin-top:10px">Show ${Math.min(30, items.length - bizHotLimit)} more of ${items.length - bizHotLimit}</button>` : ''}` : all.length ? '<div class="pane-empty">No hot finds match these filters.</div>' : `<div class="pane-empty">${h && h.aiOn === false ? 'Add ANTHROPIC_API_KEY in Railway to turn on web scanning.' : 'No scan yet. Click <b>Scan now</b> or wait for the daily auto-scan.'}</div>`}
       </div>
 
       <div class="isec"><div class="isec-h">Launches getting traction this week <span class="isec-sub">Show HN posts with 40+ points in the last 10 days · free, no key</span></div>
@@ -1814,12 +1884,15 @@
       catch (e) { showToast(`Scan failed: ${e.message}`); }
       nicheBusy = ''; rerender();
     });
-    el.querySelectorAll('[data-hsave]').forEach(b => b.addEventListener('click', () => {
-      const n = (nicheHot.items || []).find(x => x.name === b.getAttribute('data-hsave')); if (!n) return;
-      const pitch = [n.pitch, n.local_gap].filter(Boolean).join(' ');
-      upsertNiche({ ...n, pitch, description: n.pitch, pastNote: n.why_hot ? `Hot in ${n.where || 'elsewhere'}: ${n.why_hot}` : '' }, 'Hot scan');
-      showToast(`Added ${n.name} to your board`); rerender();
-    }));
+    el.querySelectorAll('[data-hsave]').forEach(b => b.addEventListener('click', () => { saveHotIdea(b.getAttribute('data-hsave')); rerender(); }));
+    const setHV = (k, v) => { hotView[k] = v; bizHotLimit = 30; saveJSON(HOT_VIEW_KEY, hotView); rerender(); };
+    const hq = el.querySelector('#hQ'); if (hq) { let t; hq.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { const pos = hq.selectionStart; setHV('q', hq.value); const n = el.querySelector('#hQ'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }, 250); }); }
+    const hs = el.querySelector('#hSort'); if (hs) hs.addEventListener('change', () => setHV('sort', hs.value));
+    [['hOverlap', 'onlyOverlap'], ['hOpen', 'openOnly'], ['hNew', 'onlyNew']].forEach(([id, k]) => { const c = el.querySelector('#' + id); if (c) c.addEventListener('change', () => setHV(k, c.checked)); });
+    const hm = el.querySelector('#hMore'); if (hm) hm.addEventListener('click', () => { bizHotLimit += 30; rerender(); });
+    const goMap = tags => { bizFilter = { ...bizFilter, tags, q: '', fits: false, status: 'open', scope: 'hot', sort: 'overlap' }; saveBizFilter(); selectLane('__niche_map__'); };
+    const ha = el.querySelector('#hAnalyze'); if (ha) ha.addEventListener('click', () => goMap([]));
+    el.querySelectorAll('[data-hbuild]').forEach(r => { const go = () => goMap(['build:' + r.getAttribute('data-hbuild')]); r.addEventListener('click', go); r.addEventListener('keydown', e => { if (e.key === 'Enter') go(); }); });
     el.querySelectorAll('[data-hshn]').forEach(b => b.addEventListener('click', () => {
       const s = nicheHot.showhn[+b.getAttribute('data-hshn')];
       nicheEvalDraft = { name: s.title.slice(0, 80), description: `Local version for my area of this Show HN launch (${s.points} points): ${s.url}` };

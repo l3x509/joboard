@@ -211,14 +211,13 @@ async function signals(q, force) {
 // Scout looks for businesses/products that are taking off somewhere else
 // (another city, online, a recent launch) and checks whether his area has one
 // yet. Runs once a day on the server (HOT_SCAN_HOURS, default 24, 0 = off) and
-// keeps a rolling history so new finds stack up between visits.
+// keeps every find so new ones stack up between visits.
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
 const DEFAULT_AREA = 'South Shore Massachusetts (Randolph, Brockton, Quincy, Weymouth, Braintree, Stoughton) and greater Boston';
 const HOT_FILE = path.join(process.env.DATA_DIR || os.tmpdir(), 'opsboard-hot-ideas.json');
-const HOT_KEEP = 40;            // rolling history size
 const HOT_MIN_FORCE_MS = 60 * 60 * 1000; // manual "scan now" at most once an hour (cost guard)
 
 let hot = { at: 0, area: DEFAULT_AREA, items: [], showhn: [], running: false, lastError: null, nextAt: 0 };
@@ -248,7 +247,7 @@ async function scanHot(callScout, area) {
   hot.running = true; hot.lastError = null; hot.lastTryAt = Date.now();
   const where = area || hot.area || DEFAULT_AREA;
   try {
-    const known = hot.items.map(i => i.name).slice(0, HOT_KEEP).join('; ');
+    const known = hot.items.map(i => i.name).slice(0, 120).join('; '); // most recent first; keeps the prompt small as history grows
     const ask = `Scan the web for 8 HOT business ideas I could replicate in ${where}. Look for things launched or clearly growing in the last ~6 months somewhere else: Product Hunt / Indie Hackers / Starter Story case studies with revenue, fast-growing local service concepts in other US cities, viral Etsy/Gumroad/Chrome-store products, new micro-SaaS with public revenue, and businesses news outlets report as booming. For EACH one, also search whether ${where} already has it, and name local competitors if any.
 Prefer ones that fit my constraints (online/async, ~10 hrs/week, under $500). A local twist is fine (e.g. a SaaS or lead-gen site for local businesses) but no in-person-heavy services.
 ${known ? `Skip these, already found: ${known}.` : ''}
@@ -260,7 +259,7 @@ Return a JSON array of 8 niche objects with these EXTRA fields: "where": "where 
     const now = new Date().toISOString();
     const byName = new Map(hot.items.map(i => [i.name.toLowerCase(), i]));
     fresh.forEach(i => { const old = byName.get(i.name.toLowerCase()); byName.set(i.name.toLowerCase(), { ...i, firstSeen: old ? old.firstSeen : now, lastSeen: now }); });
-    hot.items = [...byName.values()].sort((a, b) => (b.lastSeen || '').localeCompare(a.lastSeen || '') || b.total - a.total).slice(0, HOT_KEEP);
+    hot.items = [...byName.values()].sort((a, b) => (b.lastSeen || '').localeCompare(a.lastSeen || '') || b.total - a.total); // no cap: every find is kept
     hot.area = where; hot.at = Date.now(); if (hotHours()) hot.nextAt = hot.at + hotHours() * 3600 * 1000;
   } catch (e) { hot.lastError = e.message; console.error('hot scan', e.message); }
   try { hot.showhn = await showHn(); } catch (e) { console.error('showhn', e.message); }
