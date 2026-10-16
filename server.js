@@ -401,6 +401,13 @@ app.get('/api/niche/signals', async (req, res) => {
   catch (e) { res.status(502).json({ error: e.message }); }
 });
 
+// Hot ideas to replicate locally: auto-scanned daily (HOT_SCAN_HOURS, 0 = off), plus Show HN launches.
+app.get('/api/niche/hot', async (req, res) => {
+  try { res.json(await niche.hotRequest(callScout, { area: String(req.query.area || '').slice(0, 160), force: req.query.refresh === 'true', hasKey: !!ANTHROPIC_API_KEY })); }
+  catch (e) { res.status(502).json({ error: e.message }); }
+});
+niche.startHotScanner(callScout, !!ANTHROPIC_API_KEY);
+
 app.listen(PORT, () => {
   console.log(`Job board API listening on port ${PORT}`);
 });

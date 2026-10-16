@@ -204,4 +204,99 @@ async function signals(q, force) {
   return data;
 }
 
-module.exports = { discover, evaluate, signals, cleanNiche, extractJson, NICHE_SYSTEM_PROMPT };
+
+// ---------------------------------------------------------------------------
+// Hot ideas to replicate locally — scanned automatically on a timer
+// ---------------------------------------------------------------------------
+// Scout looks for businesses/products that are taking off somewhere else
+// (another city, online, a recent launch) and checks whether his area has one
+// yet. Runs once a day on the server (HOT_SCAN_HOURS, default 24, 0 = off) and
+// keeps a rolling history so new finds stack up between visits.
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+const DEFAULT_AREA = 'South Shore Massachusetts (Randolph, Brockton, Quincy, Weymouth, Braintree, Stoughton) and greater Boston';
+const HOT_FILE = path.join(process.env.DATA_DIR || os.tmpdir(), 'opsboard-hot-ideas.json');
+const HOT_KEEP = 40;            // rolling history size
+const HOT_MIN_FORCE_MS = 60 * 60 * 1000; // manual "scan now" at most once an hour (cost guard)
+
+let hot = { at: 0, area: DEFAULT_AREA, items: [], showhn: [], running: false, lastError: null, nextAt: 0 };
+try { const saved = JSON.parse(fs.readFileSync(HOT_FILE, 'utf8')); hot = { ...hot, ...saved, running: false }; } catch (_) {}
+function saveHot() { try { fs.writeFileSync(HOT_FILE, JSON.stringify({ ...hot, running: false })); } catch (e) { console.error('hot save', e.message); } }
+
+function cleanHot(n) {
+  const base = cleanNiche(n); if (!base) return null;
+  const str = (v, max) => String(v || '').slice(0, max);
+  return { ...base, where: str(n.where, 160), why_hot: str(n.why_hot, 300), local_gap: str(n.local_gap, 300),
+    local_competitors: (Array.isArray(n.local_competitors) ? n.local_competitors : []).map(c => str(c, 80)).filter(Boolean).slice(0, 4),
+    launch_cost: str(n.launch_cost, 120) };
+}
+
+async function showHn() {
+  const since = Math.floor(Date.now() / 1000) - 10 * 86400;
+  const r = await fetch(`https://hn.algolia.com/api/v1/search?tags=show_hn&numericFilters=created_at_i>${since},points>40&hitsPerPage=30`, { timeout: 12000 });
+  if (!r.ok) return [];
+  const d = await r.json();
+  return (d.hits || []).map(h => ({ id: 'shn-' + h.objectID, title: (h.title || '').replace(/^Show HN:\s*/i, ''), url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
+    discussion: `https://news.ycombinator.com/item?id=${h.objectID}`, points: h.points || 0, comments: h.num_comments || 0, created: h.created_at }))
+    .sort((a, b) => b.points - a.points).slice(0, 15);
+}
+
+async function scanHot(callScout, area) {
+  if (hot.running) return hot;
+  hot.running = true; hot.lastError = null; hot.lastTryAt = Date.now();
+  const where = area || hot.area || DEFAULT_AREA;
+  try {
+    const known = hot.items.map(i => i.name).slice(0, HOT_KEEP).join('; ');
+    const ask = `Scan the web for 8 HOT business ideas I could replicate in ${where}. Look for things launched or clearly growing in the last ~6 months somewhere else: Product Hunt / Indie Hackers / Starter Story case studies with revenue, fast-growing local service concepts in other US cities, viral Etsy/Gumroad/Chrome-store products, new micro-SaaS with public revenue, and businesses news outlets report as booming. For EACH one, also search whether ${where} already has it, and name local competitors if any.
+Prefer ones that fit my constraints (online/async, ~10 hrs/week, under $500). A local twist is fine (e.g. a SaaS or lead-gen site for local businesses) but no in-person-heavy services.
+${known ? `Skip these, already found: ${known}.` : ''}
+Return a JSON array of 8 niche objects with these EXTRA fields: "where": "where it is working now (city, platform)", "why_hot": "1 sentence with the growth signal", "local_competitors": ["names found locally, empty if none"], "local_gap": "1 sentence: is there an opening here and why", "launch_cost": "rough $ to launch a test". The "evidence" array must include the growth source URL and the local check URL.`;
+    const raw = await callScout([{ role: 'user', content: ask }], 8000, 16, NICHE_SYSTEM_PROMPT);
+    const parsed = extractJson(raw);
+    const fresh = (Array.isArray(parsed) ? parsed : [parsed]).map(cleanHot).filter(Boolean);
+    if (!fresh.length) throw new Error('Scan returned no ideas');
+    const now = new Date().toISOString();
+    const byName = new Map(hot.items.map(i => [i.name.toLowerCase(), i]));
+    fresh.forEach(i => { const old = byName.get(i.name.toLowerCase()); byName.set(i.name.toLowerCase(), { ...i, firstSeen: old ? old.firstSeen : now, lastSeen: now }); });
+    hot.items = [...byName.values()].sort((a, b) => (b.lastSeen || '').localeCompare(a.lastSeen || '') || b.total - a.total).slice(0, HOT_KEEP);
+    hot.area = where; hot.at = Date.now(); if (hotHours()) hot.nextAt = hot.at + hotHours() * 3600 * 1000;
+  } catch (e) { hot.lastError = e.message; console.error('hot scan', e.message); }
+  try { hot.showhn = await showHn(); } catch (e) { console.error('showhn', e.message); }
+  hot.running = false; saveHot();
+  return hot;
+}
+
+function hotStatus() { return { ...hot, scanEveryHours: hotHours(), file: undefined }; }
+function hotHours() { const h = Number(process.env.HOT_SCAN_HOURS ?? 24); return isFinite(h) && h >= 0 ? h : 24; }
+
+async function hotRequest(callScout, { area, force, hasKey }) {
+  const areaChanged = area && area !== hot.area;
+  if (hasKey && (force || areaChanged) && !hot.running) {
+    if (!areaChanged && Date.now() - hot.at < HOT_MIN_FORCE_MS) return { ...hotStatus(), aiOn: true, note: 'Scanned less than an hour ago — showing that scan.' };
+    await scanHot(callScout, area);
+  } else if (!hot.showhn.length) {
+    try { hot.showhn = await showHn(); } catch (_) {}
+  }
+  return { ...hotStatus(), aiOn: !!hasKey };
+}
+
+function startHotScanner(callScout, hasKey) {
+  const hours = hotHours();
+  if (!hasKey || !hours) { console.log('Hot-ideas scanner off', hasKey ? '(HOT_SCAN_HOURS=0)' : '(no ANTHROPIC_API_KEY)'); return; }
+  const every = hours * 3600 * 1000;
+  const setNext = () => { hot.nextAt = hot.at ? hot.at + every : Date.now() + 30000; };
+  const check = async () => {
+    const backoff = hot.lastError && Date.now() - (hot.lastTryAt || 0) < 3 * 3600 * 1000; // failed scan → wait 3h, don't burn credits
+    if (!hot.running && !backoff && Date.now() - hot.at >= every) await scanHot(callScout);
+    setNext();
+  };
+  setNext();
+  // Check soon after boot (stale saved scan → scan now), then every 15 minutes.
+  setTimeout(check, 30000).unref();
+  setInterval(check, 15 * 60 * 1000).unref();
+}
+
+module.exports = { discover, evaluate, signals, cleanNiche, extractJson, NICHE_SYSTEM_PROMPT, hotRequest, startHotScanner, scanHot, DEFAULT_AREA };
+

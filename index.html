@@ -296,7 +296,30 @@
   .niche-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 8px; align-content: start; min-width: 0; }
   .niche-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
   .niche-name { font-weight: 600; font-size: 14px; color: var(--text); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
-  .niche-past { font-size: 12px; color: var(--text-faint); margin-top: 6px; line-height: 1.45; }
+.niche-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .btag { font-family: var(--mono); font-size: 10px; padding: 2px 7px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--text-dim); cursor: pointer; }
+  .btag b { color: var(--text-faint); font-weight: 400; margin-left: 2px; }
+  .btag:hover:not(:disabled) { border-color: var(--text-dim); color: var(--text); }
+  .btag:disabled { opacity: .35; cursor: default; }
+  .btag-build { border-color: var(--teal-dim); color: var(--teal); }
+  .btag-fit { border-style: dashed; }
+  .btag.on { background: var(--amber); border-color: var(--amber); color: var(--bg); }
+  .btag.on b { color: var(--bg); }
+  .bfilter { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 12px 0 4px; display: grid; gap: 8px; }
+  .bfilter .niche-form { margin: 0; align-items: center; }
+  .bfilter-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .bfilter-l { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); width: 110px; flex-shrink: 0; }
+  .bsel { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 7px 8px; font-family: var(--mono); font-size: 11px; }
+  .niche-form .bcheck input { flex: none; min-width: 0; width: auto; padding: 0; }
+  .bcheck { font-size: 12px; color: var(--text-dim); display: flex; gap: 6px; align-items: center; }
+  .bpairs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+  .bpair { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font-size: 13px; color: var(--text); display: grid; gap: 6px; }
+  .bpair div { display: flex; flex-wrap: wrap; gap: 4px; }
+  .hot-meta { display: grid; gap: 4px; font-size: 12px; color: var(--text-dim); line-height: 1.45; }
+  .hot-meta .dim, .dim { color: var(--text-faint); }
+  .warn { color: var(--amber); }
+  @media (max-width: 700px) { .bfilter-l { width: 100%; } }
+    .niche-past { font-size: 12px; color: var(--text-faint); margin-top: 6px; line-height: 1.45; }
   .niche-past a { color: var(--teal); }
   .niche-pitch { font-size: 13px; color: var(--text-dim); line-height: 1.45; }
   .niche-card.compact .niche-pitch { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1265,6 +1288,8 @@
     { id: '__niche__', icon: '◇', label: 'Overview', title: 'Business Overview', secs: ['active', 'shortlist'], sub: 'Your active tests and shortlist. Scores are 0–100 for your capacity: about 10 hours a week, under $500 to launch, inbound selling only. At most 2 active tests at a time, each with a 2-week deadline and a kill rule.' },
     { id: '__niche_find__', icon: '⌕', label: 'Find niches', title: 'Find Niches', secs: ['find'], sub: 'Scout searches the web for online businesses that fit your skills, code and capacity, and backs every demand claim with a link.' },
     { id: '__niche_score__', icon: '✎', label: 'Score an idea', title: 'Score an Idea', secs: ['score', 'shortlist'], sub: 'Type an idea you already have. Scout checks demand and competitors and scores it against your assets.' },
+    { id: '__niche_map__', icon: '⊞', label: 'Overlaps', title: 'Idea Overlaps', secs: ['map'], sub: 'Every idea tagged by what it would take to build, how it earns, who pays and how well it fits you. Filter, then look for ideas that share a build: one codebase can test several of them.' },
+    { id: '__niche_hot__', icon: '▲', label: 'Hot to replicate', title: 'Hot Ideas to Replicate', secs: ['hot'], sub: 'The server scans the web every day for businesses taking off somewhere else and checks whether your area has one yet. New finds stack up between visits.' },
     { id: '__niche_signals__', icon: '◉', label: 'Live signals', title: 'Live Signals', secs: ['signals'], sub: 'People asking for tools and services right now. Turn any post into an idea to score.' },
   ];
   const isBizView = id => typeof id === 'string' && id.startsWith('__niche');
@@ -1465,6 +1490,8 @@
         ${scored ? relevanceMeter(n.total, '/100', `Niche score ${n.total}/100 for your capacity and assets`) : '<span class="itag">not scored yet</span>'}
       </div>
       ${n.pitch ? `<div class="niche-pitch">${escapeHtml(n.pitch)}</div>` : ''}
+      ${opts.extra || ''}
+      ${nicheTagChips(n, { all: opts.tagsAll })}
       ${n.pastNote || n.chatUrl ? `<div class="niche-past">${n.pastNote ? `<b>Earlier take:</b> ${escapeHtml(n.pastNote)} ` : ''}${n.chatUrl ? `<a target="_blank" rel="noopener" href="${escapeAttr(n.chatUrl)}">open chat ↗</a>` : ''}</div>` : ''}
       ${scored ? `<div class="niche-parts">${NICHE_SCORE_PARTS.map(([k, label, cap]) => { const v = (n.scores || {})[k] || 0; return `<span class="niche-part" title="${label}: ${v} of ${cap}"><span class="np-l">${label}</span><span class="np-t"><span class="np-f" style="width:${Math.round(100 * v / cap)}%"></span></span><span class="np-n">${v}/${cap}</span></span>`; }).join('')}</div>` : ''}
       ${scored ? `<details class="niche-more" ${opts.open ? 'open' : ''}><summary>Why you · evidence · test plan</summary>
@@ -1493,6 +1520,311 @@
     if (i >= 0) list[i] = { ...list[i], ...item, source: list[i].source || source, scoredAt: new Date().toISOString() };
     else list.push({ ...item, id: 'n' + Date.now() + Math.random().toString(36).slice(2, 6), source, status: status || 'Idea', addedAt: new Date().toISOString(), scoredAt: new Date().toISOString() });
     saveNiches(list);
+  }
+
+  // ===== Business overlaps: tag every idea on 4 dimensions, then filter and compare =====
+  const BIZ_DIMS = [
+    { id: 'build', label: 'Shared build', tags: [
+      ['AI report engine', /analy[sz]|upload|paste|report|decoder|rewrit|prompt|advisor|letter|prep pack/i],
+      ['Tracker & deadlines', /track|calendar|deadline|compliance|readiness|alert|reminder|inspection|audit/i],
+      ['Directory & lead form', /directory|lead-gen|leads|quote-request|listing|referral|introduction/i],
+      ['Content & audience', /newsletter|content|blog|\bguides?\b|youtube|media brand|substack/i],
+      ['Digital download', /printable|\bpdf\b|download|etsy|gumroad|template/i],
+      ['Data pipeline', /auction|\bdata\b|aggregat|public town|scrap|feed/i],
+      ['Browser extension', /extension|chrome store/i],
+    ] },
+    { id: 'model', label: 'Revenue model', tags: [
+      ['Subscription', /saas|subscription|\/mo\b|per month|monthly|tier|freemium|recurring/i],
+      ['Pay per report', /per report|per quote|per review|paid report|pay-per/i],
+      ['Leads & affiliate', /lead|affiliate|referral|commission|payout|introduction/i],
+      ['Ads & sponsors', /\bads?\b|cpm|sponsor|adsense|advertis/i],
+      ['One-time product', /etsy|gumroad|download|printable|template/i],
+      ['Done-for-you service', /done-for-you|productized|service\b/i],
+    ] },
+    { id: 'buyer', label: 'Who pays', tags: [
+      ['Homeowners', /homeowner|house|household|contractor/i],
+      ['Consumers', /consumer|people|\bbill\b|debt|phone|driver|remote workers|fans?\b|shoppers|parents/i],
+      ['Small businesses', /small business|local business|firms?\b|businesses|dealers?|\bmsp|practices|shops?\b/i],
+      ['Healthcare', /medical|clinic|health|patient|dental|device/i],
+      ['Property managers', /property manager|landlord|broker/i],
+      ['IT pros', /\bIT\b|sysadmin|field-service teams|technicians|\btechs?\b/],
+    ] },
+    { id: 'fit', label: 'Fit', tags: [
+      ['Reuses your code', /tracker|clearimmi|vinbidiq|\bbaz\b|driveiq|prototype|mvp was built|already built/i],
+      ['Local area', /south shore|randolph|brockton|quincy|weymouth|\btown\b|local|boston/i],
+      ['Needs outreach', /outreach|cold call|sales cycle|lead buyers|b2b sales|demos?\b/i],
+      ['In-person', /in-person|physical|on-site|hauls?\b|mobile dna|handling/i],
+      ['Liability risk', /liabil|legal advice|defamation|hipaa|immigration|regulat|licens/i],
+    ] },
+  ];
+  const BIZ_TAG_ABBR = {
+    R: 'AI report engine', T: 'Tracker & deadlines', D: 'Directory & lead form', C: 'Content & audience', P: 'Digital download', A: 'Data pipeline', X: 'Browser extension',
+    S: 'Subscription', Q: 'Pay per report', L: 'Leads & affiliate', Ad: 'Ads & sponsors', O: 'One-time product', F: 'Done-for-you service',
+    H: 'Homeowners', Cn: 'Consumers', B: 'Small businesses', Hc: 'Healthcare', Pm: 'Property managers', I: 'IT pros',
+    Re: 'Reuses your code', Lo: 'Local area', Ou: 'Needs outreach', Ip: 'In-person', Li: 'Liability risk',
+  };
+  // Hand-checked tags for the ideas from your past chats (regex is the fallback for new ones)
+  const BIZ_TAG_OVERRIDES = {
+    'driveiq': 'R,A|S|Cn|Re',
+    'contractor quote analyzer': 'R|Q|H|Re',
+    'haitian creole bedside healthcare guide': 'P|O|Hc|Re',
+    'field-service compliance tracker (saas)': 'T|S|B,Hc,I|Re,Ou,Li',
+    'clearimmi form-prep tier for small firms': 'T,R|S|B|Re,Ou,Li',
+    'vinbidiq dealer subscription': 'A,R|S|B|Re,Ou',
+    'back-office ai agent service': 'R|S,F|B|Ou',
+    'south shore pay-per-lead quote site': 'D|L|H,B|Re,Lo,Ou',
+    'neighborhood alert tool': 'T,A|S,Ad|Cn|Lo',
+    'local events newsletter': 'C,A|Ad|Cn,B|Lo',
+    'phone bill analyzer': 'R|L,F|Cn|',
+    'prompt rewriter + auto-answer': 'R,X|S|Cn|Re',
+    'true-cost-of-debt checkout extension': 'X|S|Cn|',
+    'done-for-you resale service': '|F|Cn|Ip,Lo',
+    'mobile dna & specimen collection': '|F|B|Ip,Ou,Li,Lo',
+    'root access — it humor newsletter': 'C|S,Ad|I|',
+    'printable affirmation card packs': 'P|O|Cn|',
+    'dispute document-prep services': 'R|Q,F|Cn|Li',
+    'know your rights system-navigation site': 'C|Ad,O|Cn|Li',
+    'carfax for home': 'R,A,C|Q|H|',
+    'ai relocation advisor (affiliate)': 'R|L|Cn|Li',
+    'medical device security for small practices': 'T|S,F|Hc,B|Ou,Li,Lo',
+    'field-tech smart-hands network': 'D|L,S|B,I|Ou',
+    'cyber-insurance readiness service': 'T,R|F,S|B|Ou',
+    'compliance calendar for property managers': 'T|S|Pm|Ou,Lo',
+    'celebrity social aggregator (fan hub)': 'C,A|Ad|Cn|Re,Li',
+    'baz engine (white-label directory)': 'D|S|B|Re,Ou',
+  };
+  const BIZ_TYPE_TAGS = { 'digital product': ['Digital download', 'One-time product'], 'micro-saas': ['Subscription'], 'directory': ['Directory & lead form'], 'content site': ['Content & audience', 'Ads & sponsors'], 'youtube channel': ['Content & audience', 'Ads & sponsors'], 'productized remote service': ['Done-for-you service'], 'marketplace shop': ['One-time product'] };
+  const BUILD_NOTES = {
+    'AI report engine': 'One upload → AI analysis → paid report codebase. Build it once, then each idea is a new prompt, a pricing page and a landing page.',
+    'Tracker & deadlines': 'Same core: records + due dates + reminders + an audit trail. Your upgrade tracker is already this.',
+    'Directory & lead form': 'Listings + a quote-request form that routes leads. Baz already has the listings half.',
+    'Content & audience': 'Earns slowly (SEO, subscribers). One audience can feed several of these.',
+    'Digital download': 'Fastest to test: list on Etsy/Gumroad this week, no code.',
+    'Data pipeline': 'Pull public or licensed data on a schedule and score it. Watch data licensing terms.',
+    'Browser extension': 'Distributed through the Chrome Web Store; small build, store review required.',
+  };
+  const BIZ_FILTER_KEY = 'biz-filter-v1';
+  let bizFilter = Object.assign({ tags: [], q: '', status: 'open', sort: 'score', fits: false }, loadJSON(BIZ_FILTER_KEY, {}));
+  const saveBizFilter = () => saveJSON(BIZ_FILTER_KEY, bizFilter);
+
+  function nicheTags(n) {
+    const out = { build: [], model: [], buyer: [], fit: [] };
+    if (Array.isArray(n.tagOverride)) { n.tagOverride.forEach(t => { const d = BIZ_DIMS.find(d => d.tags.some(x => x[0] === t)); if (d) out[d.id].push(t); }); return out; }
+    const ov = BIZ_TAG_OVERRIDES[(n.name || '').toLowerCase()];
+    if (ov) { ov.split('|').forEach((part, i) => { const dim = BIZ_DIMS[i].id; part.split(',').filter(Boolean).forEach(a => BIZ_TAG_ABBR[a] && out[dim].push(BIZ_TAG_ABBR[a])); }); return out; }
+    const text = [n.name, n.description, n.pitch, n.pastNote, n.why_you, n.first_dollar, n.competition, n.where, n.local_gap].filter(Boolean).join(' · ');
+    BIZ_DIMS.forEach(d => d.tags.forEach(([t, re]) => { if (re.test(text)) out[d.id].push(t); }));
+    (BIZ_TYPE_TAGS[(n.type || '').toLowerCase()] || []).forEach(t => { const d = BIZ_DIMS.find(d => d.tags.some(x => x[0] === t)); if (d && !out[d.id].includes(t)) out[d.id].push(t); });
+    return out;
+  }
+  const flatTags = tg => Object.entries(tg).flatMap(([d, ts]) => ts.map(t => `${d}:${t}`));
+  const fitsConstraints = tg => !tg.fit.includes('In-person') && !tg.fit.includes('Needs outreach');
+
+  function bizFiltered(list, ignoreDim) {
+    const q = bizFilter.q.trim().toLowerCase();
+    return list.filter(n => {
+      if (bizFilter.status === 'open' && ['Killed', 'Parked'].includes(n.status)) return false;
+      const tg = nicheTags(n);
+      if (bizFilter.fits && !fitsConstraints(tg)) return false;
+      if (q && !`${n.name} ${n.description || ''} ${n.pitch || ''} ${n.pastNote || ''}`.toLowerCase().includes(q)) return false;
+      // AND across dimensions, OR within one dimension
+      const byDim = {}; bizFilter.tags.forEach(k => { const [d, t] = k.split(':'); if (d !== ignoreDim) (byDim[d] = byDim[d] || []).push(t); });
+      return Object.entries(byDim).every(([d, ts]) => ts.some(t => tg[d].includes(t)));
+    });
+  }
+
+  function bizSort(arr) {
+    const overlap = new Map(arr.map(n => { const a = new Set(flatTags(nicheTags(n)).filter(k => !k.startsWith('fit:'))); return [n.id, arr.reduce((s, m) => m === n ? s : s + flatTags(nicheTags(m)).filter(k => a.has(k)).length, 0)]; }));
+    const by = { score: (a, b) => (b.total ?? -1) - (a.total ?? -1) || a.name.localeCompare(b.name), overlap: (a, b) => overlap.get(b.id) - overlap.get(a.id), name: (a, b) => a.name.localeCompare(b.name) }[bizFilter.sort] || ((a, b) => 0);
+    return [...arr].sort(by);
+  }
+
+  function nicheTagChips(n, opts = {}) {
+    const tg = nicheTags(n);
+    const chips = [...tg.build.map(t => ['build', t]), ...tg.model.map(t => ['model', t]), ...(opts.all ? tg.buyer.map(t => ['buyer', t]) : []), ...tg.fit.filter(t => opts.all || ['In-person', 'Needs outreach', 'Liability risk', 'Reuses your code'].includes(t)).map(t => ['fit', t])];
+    if (!chips.length) return '';
+    return `<div class="niche-tags">${chips.map(([d, t]) => `<button class="btag btag-${d} ${bizFilter.tags.includes(d + ':' + t) ? 'on' : ''}" data-btag="${escapeAttr(d + ':' + t)}" title="Show all ideas tagged ${escapeAttr(t)} in Overlaps">${escapeHtml(t)}</button>`).join('')}</div>`;
+  }
+
+  function shortlistActions(n) {
+    return `<div class="niche-actions">
+      <select data-nsel="${n.id}" aria-label="Status for ${escapeAttr(n.name)}">${NICHE_STATUSES.filter(s => s !== 'Testing' && s !== 'Building').concat(['Testing', 'Building'].includes(n.status) ? [n.status] : []).map(s => `<option ${s === n.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
+      ${typeof n.total !== 'number' ? `<button class="curated-collapse-btn" data-nscore="${n.id}" ${nicheBusy ? 'disabled' : ''}>Score it</button>` : ''}
+      ${!['Killed', 'Won', 'Testing', 'Building'].includes(n.status) ? `<button class="curated-collapse-btn" data-nstart="${n.id}">▶ Start 2-week test</button>` : ''}
+      <button class="curated-collapse-btn" data-ndel="${n.id}">Delete</button>
+    </div>`;
+  }
+
+  function bizMapHtml(list) {
+    const shown = bizSort(bizFiltered(list));
+    const scored = shown.filter(n => typeof n.total === 'number');
+    const tagsOf = new Map(shown.map(n => [n.id, nicheTags(n)]));
+    const countIn = (arr, dim, t) => arr.filter(n => nicheTags(n)[dim].includes(t)).length;
+    const builds = BIZ_DIMS[0].tags.map(([t]) => ({ t, ideas: shown.filter(n => tagsOf.get(n.id).build.includes(t)) })).filter(b => b.ideas.length).sort((a, b) => b.ideas.length - a.ideas.length);
+    const fitN = shown.filter(n => fitsConstraints(tagsOf.get(n.id))).length;
+    const reuseN = shown.filter(n => tagsOf.get(n.id).fit.includes('Reuses your code')).length;
+    const localN = shown.filter(n => tagsOf.get(n.id).fit.includes('Local area')).length;
+    const active = bizFilter.tags.length || bizFilter.q || bizFilter.fits || bizFilter.status !== 'open';
+
+    // Pairs that share the most build/model/buyer tags → merge candidates
+    const pairs = [];
+    for (let i = 0; i < shown.length; i++) for (let j = i + 1; j < shown.length; j++) {
+      const a = flatTags(tagsOf.get(shown[i].id)).filter(k => !k.startsWith('fit:')), b = new Set(flatTags(tagsOf.get(shown[j].id)).filter(k => !k.startsWith('fit:')));
+      const common = a.filter(k => b.has(k)); const union = new Set([...a, ...b]).size;
+      if (common.length >= 2) pairs.push({ a: shown[i], b: shown[j], common, j: common.length / union });
+    }
+    pairs.sort((x, y) => y.common.length - x.common.length || y.j - x.j);
+
+    const dimChips = d => {
+      const base = bizFiltered(list, d.id);
+      return `<div class="bfilter-row"><span class="bfilter-l">${escapeHtml(d.label)}</span>${d.tags.map(([t]) => { const k = d.id + ':' + t; const c = countIn(base, d.id, t); return `<button class="btag btag-${d.id} ${bizFilter.tags.includes(k) ? 'on' : ''}" data-btag="${escapeAttr(k)}" ${!c && !bizFilter.tags.includes(k) ? 'disabled' : ''}>${escapeHtml(t)} <b>${c}</b></button>`; }).join('')}</div>`;
+    };
+    const models = BIZ_DIMS[1].tags.map(x => x[0]);
+    const heatMax = Math.max(1, ...builds.flatMap(b => models.map(m => b.ideas.filter(n => tagsOf.get(n.id).model.includes(m)).length)));
+    const bars = dim => { const d = BIZ_DIMS.find(x => x.id === dim); const rows = d.tags.map(([t]) => [t, shown.filter(n => tagsOf.get(n.id)[dim].includes(t)).length]).filter(r => r[1]).sort((a, b) => b[1] - a[1]); const mx = Math.max(1, ...rows.map(r => r[1]));
+      return rows.map(([t, c]) => `<div class="ib" data-btag-row="${escapeAttr(dim + ':' + t)}" role="button" tabindex="0" style="cursor:pointer"><span class="ib-l">${escapeHtml(t)}</span><span class="ib-t"><span class="ib-f" style="width:${Math.round(100 * c / mx)}%"></span></span><span class="ib-n">${c}</span><span class="ib-p">${Math.round(100 * c / Math.max(1, shown.length))}% of ideas</span></div>`).join('') || '<div class="inote">None in this view.</div>'; };
+
+    return `
+      <div class="bfilter">
+        <div class="niche-form">
+          <input id="bQ" placeholder="Search ideas…" value="${escapeAttr(bizFilter.q)}">
+          <select id="bStatus" class="bsel"><option value="open" ${bizFilter.status === 'open' ? 'selected' : ''}>Open ideas (hide parked/killed)</option><option value="all" ${bizFilter.status === 'all' ? 'selected' : ''}>All ideas</option></select>
+          <select id="bSort" class="bsel"><option value="score" ${bizFilter.sort === 'score' ? 'selected' : ''}>Sort: best score</option><option value="overlap" ${bizFilter.sort === 'overlap' ? 'selected' : ''}>Sort: most overlap</option><option value="name" ${bizFilter.sort === 'name' ? 'selected' : ''}>Sort: name</option></select>
+          <label class="bcheck"><input type="checkbox" id="bFits" ${bizFilter.fits ? 'checked' : ''}> Fits my constraints <span class="dim">(no in-person, no outreach)</span></label>
+          ${active ? '<button class="curated-collapse-btn" id="bClear">Clear filters</button>' : ''}
+        </div>
+        ${BIZ_DIMS.map(dimChips).join('')}
+        <div class="inote">Within a row, tags are OR. Across rows, AND. Counts show what each tag would leave.</div>
+      </div>
+
+      <div class="isec"><div class="ikpis">
+        <div class="ik accent"><div class="ik-v">${shown.length}<small>/${list.length}</small></div><div class="ik-l">ideas in this view</div></div>
+        <div class="ik"><div class="ik-v">${scored.length ? Math.round(scored.reduce((s, n) => s + n.total, 0) / scored.length) : '—'}</div><div class="ik-l">average score</div><div class="ik-n">${scored.length} of ${shown.length} scored</div></div>
+        <div class="ik ${builds[0] && builds[0].ideas.length > 2 ? 'good' : ''}"><div class="ik-v">${builds[0] ? builds[0].ideas.length : 0}</div><div class="ik-l">share one build</div><div class="ik-n">${builds[0] ? escapeHtml(builds[0].t) : '—'}</div></div>
+        <div class="ik ${fitN ? 'good' : 'warn'}"><div class="ik-v">${fitN}</div><div class="ik-l">fit your constraints</div><div class="ik-n">online, inbound, no outreach</div></div>
+        <div class="ik"><div class="ik-v">${reuseN}</div><div class="ik-l">reuse code you have</div></div>
+        <div class="ik"><div class="ik-v">${localN}</div><div class="ik-l">local to your area</div></div>
+      </div></div>
+
+      <div class="isec"><div class="isec-h">Build once, test many <span class="isec-sub">ideas that could run on the same codebase · click to filter</span></div>
+        <div class="incs">${builds.map(b => { const sc = b.ideas.filter(n => typeof n.total === 'number'); const best = sc.sort((x, y) => y.total - x.total)[0]; const re = b.ideas.filter(n => tagsOf.get(n.id).fit.includes('Reuses your code'));
+          return `<div class="inc ${bizFilter.tags.includes('build:' + b.t) ? 'on' : ''}"><div class="inc-h">${escapeHtml(b.t)} <span>· ${b.ideas.length} idea${b.ideas.length > 1 ? 's' : ''}</span></div>
+            <div class="inc-s">${b.ideas.map(n => escapeHtml(n.name)).join(' · ')}</div>
+            ${re.length ? `<div class="inc-t">Head start: ${re.map(n => escapeHtml(n.name)).join(', ')}</div>` : ''}
+            <div class="inc-p">${escapeHtml(BUILD_NOTES[b.t] || '')}</div>
+            <div class="inc-c">${best ? `Best score: <b>${escapeHtml(best.name)}</b> ${best.total}/100` : 'None scored yet'}</div>
+            <button class="curated-collapse-btn" data-btag="${escapeAttr('build:' + b.t)}">${bizFilter.tags.includes('build:' + b.t) ? 'Remove filter' : 'Filter to these'}</button></div>`; }).join('') || '<div class="pane-empty">No ideas match.</div>'}</div>
+      </div>
+
+      ${builds.length ? `<div class="isec"><div class="isec-h">Build × revenue model <span class="isec-sub">where your ideas cluster · click a cell to filter</span></div>
+        <div class="iheat-wrap"><table class="iheat"><thead><tr><th></th>${models.map(m => `<th><span>${escapeHtml(m)}</span></th>`).join('')}</tr></thead><tbody>
+        ${builds.map(b => `<tr><th>${escapeHtml(b.t)}</th>${models.map(m => { const c = b.ideas.filter(n => tagsOf.get(n.id).model.includes(m)).length; const k = `build:${b.t}|model:${m}`; const on = bizFilter.tags.includes('build:' + b.t) && bizFilter.tags.includes('model:' + m);
+          return `<td><button class="iheat-c ${c / heatMax > .55 ? 'hi' : ''} ${on ? 'on' : ''}" data-bcell="${escapeAttr(k)}" ${c ? '' : 'disabled'} style="background:${c ? `rgba(232,163,61,${(0.15 + 0.85 * c / heatMax).toFixed(2)})` : 'transparent'}" title="${c} idea(s): ${escapeAttr(b.t)} + ${escapeAttr(m)}">${c || ''}</button></td>`; }).join('')}</tr>`).join('')}
+        </tbody></table></div></div>` : ''}
+
+      <div class="isec igrid">
+        <div><div class="isec-h">Who pays</div>${bars('buyer')}</div>
+        <div><div class="isec-h">Fit flags</div>${bars('fit')}</div>
+      </div>
+
+      ${pairs.length ? `<div class="isec"><div class="isec-h">Closest pairs <span class="isec-sub">ideas sharing 2+ build, model or buyer tags · merge candidates or one test for both</span></div>
+        <div class="bpairs">${pairs.slice(0, 8).map(p => `<div class="bpair"><b>${escapeHtml(p.a.name)}</b> <span class="dim">+</span> <b>${escapeHtml(p.b.name)}</b><div>${p.common.map(k => `<span class="itag lanes">${escapeHtml(k.split(':')[1])}</span>`).join(' ')}</div></div>`).join('')}</div></div>` : ''}
+
+      <div class="isec"><div class="isec-h">Matching ideas (${shown.length})</div>
+        ${shown.length ? `<div class="niche-grid">${shown.map(n => nicheCardHtml(n, { compact: true, tagsAll: true, actions: shortlistActions(n) })).join('')}</div>` : '<div class="pane-empty">No ideas match these filters.</div>'}
+      </div>`;
+  }
+
+  function wireBizMap(el) {
+    const rerender = () => { renderNiches(el); renderNav(); };
+    const toggle = k => { bizFilter.tags = bizFilter.tags.includes(k) ? bizFilter.tags.filter(x => x !== k) : [...bizFilter.tags, k]; saveBizFilter(); };
+    el.querySelectorAll('[data-btag]').forEach(b => b.addEventListener('click', () => { toggle(b.getAttribute('data-btag')); if (activeLane !== '__niche_map__') selectLane('__niche_map__'); else rerender(); }));
+    el.querySelectorAll('[data-btag-row]').forEach(b => { const go = () => { toggle(b.getAttribute('data-btag-row')); rerender(); }; b.addEventListener('click', go); b.addEventListener('keydown', e => { if (e.key === 'Enter') go(); }); });
+    el.querySelectorAll('[data-bcell]').forEach(b => b.addEventListener('click', () => {
+      const ks = b.getAttribute('data-bcell').split('|'); const allOn = ks.every(k => bizFilter.tags.includes(k));
+      bizFilter.tags = bizFilter.tags.filter(k => !k.startsWith('build:') && !k.startsWith('model:'));
+      if (!allOn) bizFilter.tags.push(...ks); saveBizFilter(); rerender();
+    }));
+    const q = el.querySelector('#bQ'); if (q) { let t; q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { bizFilter.q = q.value; saveBizFilter(); const pos = q.selectionStart; rerender(); const n = el.querySelector('#bQ'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }, 250); }); }
+    const st = el.querySelector('#bStatus'); if (st) st.addEventListener('change', () => { bizFilter.status = st.value; saveBizFilter(); rerender(); });
+    const so = el.querySelector('#bSort'); if (so) so.addEventListener('change', () => { bizFilter.sort = so.value; saveBizFilter(); rerender(); });
+    const fi = el.querySelector('#bFits'); if (fi) fi.addEventListener('change', () => { bizFilter.fits = fi.checked; saveBizFilter(); rerender(); });
+    const cl = el.querySelector('#bClear'); if (cl) cl.addEventListener('click', () => { bizFilter = { tags: [], q: '', status: 'open', sort: bizFilter.sort, fits: false }; saveBizFilter(); rerender(); });
+  }
+
+  // ===== Hot ideas to replicate locally (server scans the web on a timer) =====
+  const NICHE_HOT_KEY = 'niche-hot-v1';
+  const NICHE_HOT_VISIT_KEY = 'niche-hot-visit-v1';
+  let nicheHot = loadJSON(NICHE_HOT_KEY, null);
+  let nicheHotFetched = 0;
+  let hotVisitPrev = null;   // last visit before this session's first look — 'new' is relative to it
+  let hotBgFetch = false;
+  const hotNewCount = () => { const v = loadJSON(NICHE_HOT_VISIT_KEY, ''); return nicheHot && nicheHot.items ? nicheHot.items.filter(i => !v || (i.firstSeen || '') > v).length : 0; };
+
+  async function fetchHot({ refresh = false, area = '' } = {}) {
+    const qs = new URLSearchParams(); if (refresh) qs.set('refresh', 'true'); if (area) qs.set('area', area);
+    const d = await nicheApi('/api/niche/hot?' + qs.toString());
+    nicheHot = d; nicheHotFetched = Date.now(); saveJSON(NICHE_HOT_KEY, d); return d;
+  }
+
+  function bizHotHtml(list) {
+    const h = nicheHot;
+    const saved = new Set(list.map(n => n.name.toLowerCase()));
+    const visit = hotVisitPrev !== null ? hotVisitPrev : loadJSON(NICHE_HOT_VISIT_KEY, '');
+    // which of his shared builds each hot idea would plug into
+    const buildCounts = {}; list.filter(n => !['Killed'].includes(n.status)).forEach(n => nicheTags(n).build.forEach(t => buildCounts[t] = (buildCounts[t] || 0) + 1));
+    const fmt = ms => ms ? new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
+    const items = h && h.items ? [...h.items].sort((a, b) => ((b.firstSeen || '') > visit) - ((a.firstSeen || '') > visit) || b.total - a.total) : [];
+    return `
+      <div class="niche-form">
+        <input id="hArea" placeholder="Area to replicate in" value="${escapeAttr(h && h.area || 'South Shore Massachusetts and greater Boston')}" style="flex:2">
+        <button class="tb-btn primary" id="hScan" ${nicheBusy ? 'disabled' : ''}>${nicheBusy === 'hot' ? 'Scanning the web… (1–2 minutes)' : 'Scan now'}</button>
+      </div>
+      <div class="niche-sub">${h ? `${h.aiOn === false ? '<b class="warn">Web scanning is off: ANTHROPIC_API_KEY is not set on the server.</b> ' : ''}${h.scanEveryHours ? `Auto-scans every ${h.scanEveryHours} h on the server` : 'Auto-scan is off (HOT_SCAN_HOURS=0)'} · last scan ${fmt(h.at)}${h.nextAt && h.scanEveryHours ? ` · next about ${fmt(h.nextAt)}` : ''} · keeps the last 40 finds${h.running ? ' · <b>scan running now</b>' : ''}${h.note ? ` · ${escapeHtml(h.note)}` : ''}${h.lastError ? `<br><span class="warn">Last scan failed: ${escapeHtml(h.lastError)}</span>` : ''}` : 'Loading…'}</div>
+
+      <div class="isec"><div class="isec-h">Hot ideas to replicate (${items.length}) <span class="isec-sub">working somewhere else, checked against your area · new since your last visit first</span></div>
+        ${items.length ? `<div class="niche-grid">${items.map((n, i) => {
+          const isNew = (n.firstSeen || '') > visit; const tg = nicheTags(n);
+          const plugs = tg.build.filter(t => buildCounts[t]);
+          return nicheCardHtml({ ...n, source: isNew ? 'New' : 'Hot scan' }, { compact: true, tagsAll: false, extra: `
+            <div class="hot-meta">
+              ${n.where ? `<div><span class="dim">Working in:</span> ${escapeHtml(n.where)}</div>` : ''}
+              ${n.why_hot ? `<div><span class="dim">Why hot:</span> ${escapeHtml(n.why_hot)}</div>` : ''}
+              ${n.local_gap ? `<div><span class="dim">Your area:</span> ${escapeHtml(n.local_gap)}</div>` : ''}
+              <div><span class="dim">Local competitors:</span> ${n.local_competitors && n.local_competitors.length ? n.local_competitors.map(c => `<span class="itag">${escapeHtml(c)}</span>`).join(' ') : '<span class="itag on">none found</span>'}</div>
+              ${n.launch_cost ? `<div><span class="dim">Launch cost:</span> ${escapeHtml(n.launch_cost)}</div>` : ''}
+              ${plugs.length ? `<div class="inc-t">Shares a build with ${plugs.map(t => `${escapeHtml(t)} (${buildCounts[t]} of your ideas)`).join(', ')}</div>` : ''}
+            </div>`, actions: `<div class="niche-actions">${saved.has(n.name.toLowerCase()) ? '<span class="itag on">on your board</span>' : `<button class="curated-collapse-btn" data-hsave="${escapeAttr(n.name)}">+ Add to board</button>`}<span class="dim" style="font-size:11px">${n.firstSeen ? postedAgoLabel(n.firstSeen).replace(/^Posted/, 'Found') : ''}</span></div>` });
+        }).join('')}</div>` : `<div class="pane-empty">${h && h.aiOn === false ? 'Add ANTHROPIC_API_KEY in Railway to turn on web scanning.' : 'No scan yet. Click <b>Scan now</b> or wait for the daily auto-scan.'}</div>`}
+      </div>
+
+      <div class="isec"><div class="isec-h">Launches getting traction this week <span class="isec-sub">Show HN posts with 40+ points in the last 10 days · free, no key</span></div>
+        ${h && h.showhn && h.showhn.length ? `<div class="niche-signals">${h.showhn.map((s, i) => `<div class="adv-row"><div><a target="_blank" rel="noopener" href="${escapeAttr(s.url)}">${escapeHtml(s.title)}</a><span class="adv-reason">Show HN</span>
+          <small>${s.points} points · <a target="_blank" rel="noopener" href="${escapeAttr(s.discussion)}">${s.comments} comments</a> · ${postedAgoLabel(s.created)}</small></div>
+          <div class="adv-actions"><button class="curated-collapse-btn" data-hshn="${i}">Score as local idea</button></div></div>`).join('')}</div>` : '<div class="pane-empty">Nothing loaded yet.</div>'}
+      </div>`;
+  }
+
+  function wireHot(el) {
+    const rerender = () => { renderNiches(el); renderNav(); };
+    const scan = el.querySelector('#hScan'); if (scan) scan.addEventListener('click', async () => {
+      const area = el.querySelector('#hArea').value.trim();
+      nicheBusy = 'hot'; renderNiches(el);
+      try { const d = await fetchHot({ refresh: true, area: area !== (nicheHot && nicheHot.area) ? area : '' }); if (d.note) showToast(d.note); else if (d.lastError) showToast('Scan failed: ' + d.lastError); else showToast(`Scan done — ${d.items.length} ideas`); }
+      catch (e) { showToast(`Scan failed: ${e.message}`); }
+      nicheBusy = ''; rerender();
+    });
+    el.querySelectorAll('[data-hsave]').forEach(b => b.addEventListener('click', () => {
+      const n = (nicheHot.items || []).find(x => x.name === b.getAttribute('data-hsave')); if (!n) return;
+      const pitch = [n.pitch, n.local_gap].filter(Boolean).join(' ');
+      upsertNiche({ ...n, pitch, description: n.pitch, pastNote: n.why_hot ? `Hot in ${n.where || 'elsewhere'}: ${n.why_hot}` : '' }, 'Hot scan');
+      showToast(`Added ${n.name} to your board`); rerender();
+    }));
+    el.querySelectorAll('[data-hshn]').forEach(b => b.addEventListener('click', () => {
+      const s = nicheHot.showhn[+b.getAttribute('data-hshn')];
+      nicheEvalDraft = { name: s.title.slice(0, 80), description: `Local version for my area of this Show HN launch (${s.points} points): ${s.url}` };
+      selectLane('__niche_score__'); showToast('Edit the name into your local version, then click Score it');
+    }));
   }
 
   function renderNiches(el) {
@@ -1551,14 +1883,11 @@
 
       <div class="isec" data-nsec="shortlist">
         <div class="isec-h">Shortlist (${shortlist.length}) <span class="isec-sub">best score first · parked and killed at the bottom</span></div>
-        ${shortlist.length ? `<div class="niche-grid">${shortlist.map(n => nicheCardHtml(n, { compact: true, actions: `
-          <div class="niche-actions">
-            <select data-nsel="${n.id}" aria-label="Status for ${escapeAttr(n.name)}">${NICHE_STATUSES.filter(s => s !== 'Testing' && s !== 'Building').map(s => `<option ${s === n.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
-            ${typeof n.total !== 'number' ? `<button class="curated-collapse-btn" data-nscore="${n.id}" ${nicheBusy ? 'disabled' : ''}>Score it</button>` : ''}
-            ${!['Killed', 'Won'].includes(n.status) ? `<button class="curated-collapse-btn" data-nstart="${n.id}">▶ Start 2-week test</button>` : ''}
-            <button class="curated-collapse-btn" data-ndel="${n.id}">Delete</button>
-          </div>` })).join('')}</div>` : '<div class="pane-empty">Nothing saved yet.</div>'}
+        ${shortlist.length ? `<div class="niche-grid">${shortlist.map(n => nicheCardHtml(n, { compact: true, actions: shortlistActions(n) })).join('')}</div>` : '<div class="pane-empty">Nothing saved yet.</div>'}
       </div>
+
+      <div data-nsec="map">${view.secs.includes('map') ? bizMapHtml(list) : ''}</div>
+      <div data-nsec="hot">${view.secs.includes('hot') ? bizHotHtml(list) : ''}</div>
 
       <div class="isec" data-nsec="signals">
         <div class="isec-h">Live signals <span class="isec-sub">people asking for tools and services · Hacker News free · Reddit and YouTube when their keys are set</span></div>
@@ -1578,6 +1907,12 @@
       el.querySelector('[data-nsec="active"]').insertAdjacentHTML('beforebegin', `<div class="context-note">Start here: open <b>Score an idea</b> to score your saved ideas, or <b>Find niches</b> to research new ones. Then start a 2-week test on the best one.</div>`);
     }
     wireNiches(el);
+    if (view.id === '__niche_map__') wireBizMap(el); else el.querySelectorAll('[data-btag]').forEach(b => b.addEventListener('click', () => { const k = b.getAttribute('data-btag'); if (!bizFilter.tags.includes(k)) bizFilter.tags.push(k); saveBizFilter(); selectLane('__niche_map__'); }));
+    if (view.id === '__niche_hot__') {
+      wireHot(el);
+      if (hotVisitPrev === null) { hotVisitPrev = loadJSON(NICHE_HOT_VISIT_KEY, ''); saveJSON(NICHE_HOT_VISIT_KEY, new Date().toISOString()); }
+      if (!nicheBusy && Date.now() - nicheHotFetched > 10 * 60 * 1000) fetchHot().then(() => { if (activeLane === '__niche_hot__') renderNiches(el); }).catch(e => showToast('Hot ideas: ' + e.message));
+    }
   }
 
   function wireNiches(el) {
@@ -1799,9 +2134,10 @@
 
   // ===== Nav rail =====
   function renderBizNav(el) {
+    if (!hotBgFetch) { hotBgFetch = true; fetchHot().then(() => renderNav()).catch(() => {}); }
     const list = loadNiches();
     const last = loadJSON(NICHE_LAST_KEY, null);
-    const badge = { '__niche__': `${activeNiches(list).length}/${NICHE_ACTIVE_LIMIT}`, '__niche_find__': last && last.items ? last.items.length : '', '__niche_score__': list.filter(n => typeof n.total !== 'number').length ? `${list.filter(n => typeof n.total !== 'number').length} unscored` : '', '__niche_signals__': nicheSignals && nicheSignals.items ? nicheSignals.items.length : '' };
+    const badge = { '__niche__': `${activeNiches(list).length}/${NICHE_ACTIVE_LIMIT}`, '__niche_find__': last && last.items ? last.items.length : '', '__niche_score__': list.filter(n => typeof n.total !== 'number').length ? `${list.filter(n => typeof n.total !== 'number').length} unscored` : '', '__niche_signals__': nicheSignals && nicheSignals.items ? nicheSignals.items.length : '', '__niche_map__': bizFilter.tags.length || bizFilter.q || bizFilter.fits ? 'filtered' : '', '__niche_hot__': hotNewCount() ? `${hotNewCount()} new` : '' };
     el.innerHTML = `<div class="nav-group-label">Business</div>` + BIZ_VIEWS.map(v => `
       <div class="nav-item all-lanes ${activeLane === v.id ? 'active' : ''}" data-nav="${v.id}">
         <span class="nav-num">${v.icon}</span>
