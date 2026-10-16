@@ -405,7 +405,7 @@ app.get('/api/niche/signals', async (req, res) => {
 
 // Hot ideas to replicate locally: auto-scanned daily (HOT_SCAN_HOURS, 0 = off), plus Show HN launches.
 app.get('/api/niche/hot', async (req, res) => {
-  try { res.json(await niche.hotRequest({ area: String(req.query.area || '').slice(0, 160), force: req.query.refresh === 'true' })); }
+  try { res.json(await niche.hotRequest({ area: String(req.query.area || '').slice(0, 160), force: req.query.refresh === 'true', feeds: req.query.feeds === 'true' })); }
   catch (e) { bizErr(res, e); }
 });
 // Pattern analysis over all hot finds (clusters, blind angles, gaps). Body: { board: [{name,pitch,status}], force }
@@ -413,6 +413,13 @@ app.post('/api/niche/hot/analyze', async (req, res) => {
   try { res.json({ ...(await niche.analyzeHot({ force: req.body.force === true, board: req.body.board })), budget: aibudget.budgetStatus() }); }
   catch (e) { bizErr(res, e); }
 });
+// Write up feed items as hot finds (Haiku, no web search). Body: { ids?: [...] } — none = all new items
+app.post('/api/niche/hot/writeup', async (req, res) => {
+  try { res.json(await niche.writeUp(req.body.ids)); } catch (e) { bizErr(res, e); }
+});
+// Paid automatic jobs (all off by default)
+app.get('/api/niche/settings', (req, res) => res.json(niche.getSettings()));
+app.post('/api/niche/settings', (req, res) => res.json(niche.setSettings(req.body || {})));
 // "Check my area" for one hot find (2 web searches)
 app.post('/api/niche/hot/check', async (req, res) => {
   try { res.json({ item: await niche.checkLocal(String(req.body.name || '').slice(0, 120)), budget: aibudget.budgetStatus() }); }

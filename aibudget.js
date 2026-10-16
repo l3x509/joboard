@@ -5,8 +5,9 @@
 //   - Web searches are the real cost ($0.01 each), so callers pass a small,
 //     explicit number of searches — 0 for most automatic work.
 //   - Spend is measured from the API's usage numbers and kept per calendar month.
-//   - Hard cap: BIZ_MONTHLY_BUDGET (default $1.00). Automatic jobs may use only
-//     part of it (BIZ_AUTO_SHARE, default 60%) so your own clicks always have room.
+//   - Hard cap: BIZ_MONTHLY_BUDGET (default $5.00). Paid automatic jobs are OFF by
+//     default; if you switch any on, they may use only part of the cap
+//     (BIZ_AUTO_SHARE, default 60%) so your own clicks always have room.
 //   - The spend file lives in DATA_DIR (a Railway volume) so redeploys don't reset it.
 
 const fs = require('fs');
@@ -16,7 +17,7 @@ const fetch = require('node-fetch');
 
 const FILE = path.join(process.env.DATA_DIR || os.tmpdir(), 'opsboard-ai-spend.json');
 const MODEL = process.env.BIZ_MODEL || 'claude-haiku-5-5';
-const BUDGET = Math.max(0, Number(process.env.BIZ_MONTHLY_BUDGET ?? 1) || 0);
+const BUDGET = Math.max(0, Number(process.env.BIZ_MONTHLY_BUDGET ?? 5) || 0);
 const AUTO_SHARE = Math.min(1, Math.max(0, Number(process.env.BIZ_AUTO_SHARE ?? 0.6)));
 const SEARCH_COST = 0.01; // $10 per 1,000 web searches
 
