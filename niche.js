@@ -15,6 +15,7 @@
 //   YOUTUBE_API_KEY                        — free key in Google Cloud console (YouTube Data API v3)
 
 const fetch = require('node-fetch');
+const { ai } = require('./aibudget'); // Haiku 5.5 + monthly spend cap ($1 default)
 
 const RESEARCH_TTL_MS = 12 * 60 * 60 * 1000;
 const SIGNAL_TTL_MS = 60 * 60 * 1000;
@@ -76,12 +77,12 @@ function cleanNiche(n) {
 
 const researchCache = new Map(); // key -> { at, items }
 
-async function discover(callScout, focus, force) {
+async function discover(_unused, focus, force) {
   const key = 'discover:' + (focus || '').toLowerCase().trim();
   const hit = researchCache.get(key);
   if (!force && hit && Date.now() - hit.at < RESEARCH_TTL_MS) return { items: hit.items, fromCache: true, at: hit.at };
-  const ask = `Find 6 online business niches for me${focus ? ` in or near this area: "${focus}"` : ' across any field (not only IT)'}. Search the web for real demand evidence for each (forums asking for it, marketplace listings with sales/reviews, competitor pricing, search-trend or YouTube data). Mix types (digital product, micro-SaaS, directory, content/YouTube, productized remote service). Rank by total. Return a JSON array of 6 niche objects.`;
-  const raw = await callScout([{ role: 'user', content: ask }], 6000, 14, NICHE_SYSTEM_PROMPT);
+  const ask = `Find 6 online business niches for me${focus ? ` in or near this area: "${focus}"` : ' across any field (not only IT)'}. Use your few web searches wisely (search broad pages that cover several niches) to find real demand evidence for each (forums asking for it, marketplace listings with sales/reviews, competitor pricing, search-trend or YouTube data). Mix types (digital product, micro-SaaS, directory, content/YouTube, productized remote service). Rank by total. Return a JSON array of 6 niche objects.`;
+  const raw = await ai({ system: NICHE_SYSTEM_PROMPT, ask, maxTokens: 5000, searches: 4, purpose: 'Find niches' }); // ~$0.05
   const parsed = extractJson(raw);
   const items = (Array.isArray(parsed) ? parsed : [parsed]).map(cleanNiche).filter(Boolean).sort((a, b) => b.total - a.total);
   if (!items.length) throw new Error('No niches came back from research');
@@ -89,11 +90,11 @@ async function discover(callScout, focus, force) {
   return { items, fromCache: false, at: Date.now() };
 }
 
-async function evaluate(callScout, idea) {
+async function evaluate(_unused, idea) {
   const name = String(idea.name || '').slice(0, 120), desc = String(idea.description || '').slice(0, 1200);
   if (name.length < 2) throw new Error('idea name required');
   const ask = `Evaluate this business idea of mine honestly: "${name}"${desc ? ` — ${desc}` : ''}. Search the web for demand evidence and competitors. If it's weak, say so with low scores and suggest a sharper variant in "pitch". Return ONE niche JSON object.`;
-  const raw = await callScout([{ role: 'user', content: ask }], 3000, 8, NICHE_SYSTEM_PROMPT);
+  const raw = await ai({ system: NICHE_SYSTEM_PROMPT, ask, maxTokens: 2500, searches: 3, purpose: 'Score an idea' }); // ~$0.04
   const parsed = extractJson(raw);
   const item = cleanNiche(Array.isArray(parsed) ? parsed[0] : parsed);
   if (!item) throw new Error('Evaluation did not return a niche');
@@ -220,7 +221,24 @@ const DEFAULT_AREA = 'South Shore Massachusetts (Randolph, Brockton, Quincy, Wey
 const HOT_FILE = path.join(process.env.DATA_DIR || os.tmpdir(), 'opsboard-hot-ideas.json');
 const HOT_MIN_FORCE_MS = 60 * 60 * 1000; // manual "scan now" at most once an hour (cost guard)
 
-let hot = { at: 0, area: DEFAULT_AREA, items: [], showhn: [], running: false, lastError: null, nextAt: 0, analysis: null, analyzing: false, analysisError: null, board: [] };
+let hot = { at: 0, area: DEFAULT_AREA, items: [], showhn: [], feed: [], feedAt: 0, running: false, lastError: null, nextAt: 0, analysis: null, analyzing: false, analysisError: null, board: [] };
+
+// Paid automatic jobs — ALL OFF by default. Everything that costs money runs only
+// when Dulex clicks it, unless he switches one of these on in the Hot tab.
+const SETTINGS_FILE = path.join(process.env.DATA_DIR || os.tmpdir(), 'opsboard-biz-settings.json');
+const SETTINGS_DEFAULT = { autoWriteup: false, autoLocalTop: 0, autoAnalyzeDays: 0 };
+let bizSettings = { ...SETTINGS_DEFAULT };
+try { bizSettings = { ...bizSettings, ...JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) }; } catch (_) {}
+function getSettings() { return { ...bizSettings }; }
+function setSettings(s = {}) {
+  const n = { ...bizSettings };
+  if ('autoWriteup' in s) n.autoWriteup = s.autoWriteup === true;
+  if ('autoLocalTop' in s) n.autoLocalTop = Math.max(0, Math.min(10, Math.round(Number(s.autoLocalTop) || 0)));
+  if ('autoAnalyzeDays' in s) n.autoAnalyzeDays = Math.max(0, Math.min(30, Math.round(Number(s.autoAnalyzeDays) || 0)));
+  bizSettings = n;
+  try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(n)); } catch (e) { console.error('settings save', e.message); }
+  return getSettings();
+}
 try { const saved = JSON.parse(fs.readFileSync(HOT_FILE, 'utf8')); hot = { ...hot, ...saved, running: false, analyzing: false }; } catch (_) {}
 function saveHot() { try { fs.writeFileSync(HOT_FILE, JSON.stringify({ ...hot, running: false, analyzing: false })); } catch (e) { console.error('hot save', e.message); } }
 
@@ -229,7 +247,54 @@ function cleanHot(n) {
   const str = (v, max) => String(v || '').slice(0, max);
   return { ...base, where: str(n.where, 160), why_hot: str(n.why_hot, 300), local_gap: str(n.local_gap, 300),
     local_competitors: (Array.isArray(n.local_competitors) ? n.local_competitors : []).map(c => str(c, 80)).filter(Boolean).slice(0, 4),
-    launch_cost: str(n.launch_cost, 120) };
+    launch_cost: str(n.launch_cost, 120), local_checked: n.local_checked === true, feed: str(n.feed, 40) };
+}
+
+// ---- Free discovery feeds (no AI, no key) ----
+function decodeXml(t) { return String(t || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/\s+/g, ' ').trim(); }
+const NEWS_QUERIES = ['fastest growing small business', 'side hustle making money online', 'startup launches app for small businesses', 'booming local service business', 'solo founder revenue micro saas'];
+async function googleNews(q) {
+  const r = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(q + ' when:30d')}&hl=en-US&gl=US&ceid=US:en`, { timeout: 12000, headers: { 'User-Agent': 'Mozilla/5.0 (OpsBoard personal dashboard)' } });
+  if (!r.ok) return [];
+  const xml = await r.text();
+  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 8).map(m => {
+    const it = m[1], g = tag => { const x = it.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\/${tag}>`)); return x ? decodeXml(x[1]) : ''; };
+    return { feed: 'Google News', title: g('title'), url: g('link'), snippet: g('source'), date: g('pubDate') };
+  }).filter(i => i.title && i.url);
+}
+async function productHunt() {
+  const r = await fetch('https://www.producthunt.com/feed', { timeout: 12000, headers: { 'User-Agent': 'Mozilla/5.0 (OpsBoard personal dashboard)' } });
+  if (!r.ok) return [];
+  const xml = await r.text();
+  return [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].slice(0, 20).map(m => {
+    const it = m[1]; const t = it.match(/<title[^>]*>([\s\S]*?)<\/title>/); const l = it.match(/<link[^>]*href="([^"]+)"/); const c = it.match(/<content[^>]*>([\s\S]*?)<\/content>/);
+    return { feed: 'Product Hunt', title: t ? decodeXml(t[1]) : '', url: l ? l[1] : '', snippet: c ? decodeXml(c[1]).slice(0, 160) : '' };
+  }).filter(i => i.title && i.url);
+}
+// Free: pull the feeds into hot.feed (raw items, no AI). Keeps the newest 300.
+async function fetchFeeds() {
+  const cands = await freeCandidates();
+  const now = new Date().toISOString();
+  const byUrl = new Map((hot.feed || []).map(f => [f.url, f]));
+  let added = 0;
+  cands.forEach(c => { if (!byUrl.has(c.url)) { byUrl.set(c.url, { ...c, id: 'f' + Buffer.from(c.url).toString('base64').replace(/[^a-z0-9]/gi, '').slice(-16), firstSeen: now, reviewed: false }); added++; } });
+  hot.feed = [...byUrl.values()].sort((a, b) => (b.firstSeen || '').localeCompare(a.firstSeen || '')).slice(0, 300);
+  hot.feedAt = Date.now();
+  try { hot.showhn = await showHn(); } catch (_) {}
+  saveHot();
+  return added;
+}
+async function freeCandidates() {
+  const settled = await Promise.allSettled([showHn(), productHunt(), ...NEWS_QUERIES.map(googleNews)]);
+  const out = []; const seen = new Set();
+  settled.forEach((s, i) => {
+    if (s.status !== 'fulfilled') { console.error('feed', i, s.reason && s.reason.message); return; }
+    (s.value || []).forEach(x => {
+      const item = x.feed ? x : { feed: 'Show HN', title: x.title, url: x.url, snippet: `${x.points} points, ${x.comments} comments` };
+      const k = item.title.toLowerCase().slice(0, 60); if (seen.has(k)) return; seen.add(k); out.push(item);
+    });
+  });
+  return out.slice(0, 70);
 }
 
 async function showHn() {
@@ -242,30 +307,65 @@ async function showHn() {
     .sort((a, b) => b.points - a.points).slice(0, 15);
 }
 
-async function scanHot(callScout, area) {
+// mode 'free' (daily, automatic): candidates from free feeds, Haiku picks and writes them up, no web search (~$0.003).
+// mode 'deep' (Scan now button): Haiku with 5 web searches, includes a local check (~$0.06).
+async function scanHot(area, { mode = 'free', auto = false, ids = null } = {}) {
   if (hot.running) return hot;
   hot.running = true; hot.lastError = null; hot.lastTryAt = Date.now();
   const where = area || hot.area || DEFAULT_AREA;
   try {
     const known = hot.items.map(i => i.name).slice(0, 120).join('; '); // most recent first; keeps the prompt small as history grows
-    const ask = `Scan the web for 8 HOT business ideas I could replicate in ${where}. Look for things launched or clearly growing in the last ~6 months somewhere else: Product Hunt / Indie Hackers / Starter Story case studies with revenue, fast-growing local service concepts in other US cities, viral Etsy/Gumroad/Chrome-store products, new micro-SaaS with public revenue, and businesses news outlets report as booming. For EACH one, also search whether ${where} already has it, and name local competitors if any.
-Prefer ones that fit my constraints (online/async, ~10 hrs/week, under $500). A local twist is fine (e.g. a SaaS or lead-gen site for local businesses) but no in-person-heavy services.
+    const shape = `Return ONLY a JSON array of niche objects with these EXTRA fields: "where": "where it is working now (city, platform)", "why_hot": "1 sentence with the growth signal", "local_competitors": ["names found locally, empty if none or not checked"], "local_gap": "1 sentence about the opening in my area", "launch_cost": "rough $ to launch a test", "feed": "where you found it"`;
+    let ask, searches = 0, cands = [];
+    if (mode === 'deep') {
+      searches = 5;
+      ask = `Scan the web for 6 HOT business ideas I could replicate in ${where}: launched or clearly growing in the last ~6 months somewhere else (Product Hunt / Indie Hackers / Starter Story with revenue, fast-growing local service concepts in other US cities, viral Etsy/Gumroad/Chrome-store products, booming businesses in the news). You only have 5 searches: use broad roundup pages, then spend 1-2 on checking whether ${where} already has the best ones. Prefer online/async ideas that fit ~10 hrs/week and under $500.
 ${known ? `Skip these, already found: ${known}.` : ''}
-Return a JSON array of 8 niche objects with these EXTRA fields: "where": "where it is working now (city, platform)", "why_hot": "1 sentence with the growth signal", "local_competitors": ["names found locally, empty if none"], "local_gap": "1 sentence: is there an opening here and why", "launch_cost": "rough $ to launch a test". The "evidence" array must include the growth source URL and the local check URL.`;
-    const raw = await callScout([{ role: 'user', content: ask }], 8000, 16, NICHE_SYSTEM_PROMPT);
+${shape}. Set "local_checked": true only for ideas you actually searched locally. Evidence URLs must be pages you found.`;
+    } else {
+      if (!(hot.feed || []).length) await fetchFeeds();
+      const pool = ids && ids.length ? hot.feed.filter(f => ids.includes(f.id)) : hot.feed.filter(f => !f.reviewed);
+      cands = pool.slice(0, 40);
+      if (!cands.length) throw new Error(ids ? 'Those feed items are gone' : 'No new feed items to write up');
+      ask = `Below are this week's items from free feeds (Show HN, Product Hunt, Google News). Using ONLY these items (no outside facts), pick up to ${Math.min(8, cands.length)} that point to a business I could replicate in ${where} or online — the item itself, a local version, or the business opportunity the news reveals. Skip pure dev tools, crypto, and anything needing heavy capital.
+${known ? `Skip these, already found: ${known}.\n` : ''}
+ITEMS:
+${cands.map((c, i) => `${i + 1}. [${c.feed}] ${c.title} — ${c.snippet || ''} — ${c.url}`).join('\n')}
+
+${shape}. "evidence" must be [{"claim": "...", "url": "<the item's exact URL from the list>"}]. You have NOT checked my area: start "local_gap" with "Unverified:" and leave "local_competitors" empty. Be conservative with demand scores — one news item is weak evidence.`;
+    }
+    const raw = await ai({ system: NICHE_SYSTEM_PROMPT, ask, maxTokens: 5000, searches, auto, purpose: mode === 'deep' ? 'Deep hot scan' : (auto ? 'Auto write-up' : 'Write up feed items') });
     const parsed = extractJson(raw);
-    const fresh = (Array.isArray(parsed) ? parsed : [parsed]).map(cleanHot).filter(Boolean);
+    const fresh = (Array.isArray(parsed) ? parsed : [parsed]).map(x => cleanHot({ ...x, local_checked: mode === 'deep' && x.local_checked === true })).filter(Boolean);
     if (!fresh.length) throw new Error('Scan returned no ideas');
     const now = new Date().toISOString();
     const byName = new Map(hot.items.map(i => [i.name.toLowerCase(), i]));
     fresh.forEach(i => { const old = byName.get(i.name.toLowerCase()); byName.set(i.name.toLowerCase(), { ...i, firstSeen: old ? old.firstSeen : now, lastSeen: now }); });
     hot.items = [...byName.values()].sort((a, b) => (b.lastSeen || '').localeCompare(a.lastSeen || '') || b.total - a.total); // no cap: every find is kept
     hot.area = where; hot.at = Date.now(); if (hotHours()) hot.nextAt = hot.at + hotHours() * 3600 * 1000;
+    hot.lastMode = mode;
+    if (mode !== 'deep') { const used = new Set(cands.map(c => c.id)); hot.feed.forEach(f => { if (used.has(f.id)) { f.reviewed = true; f.reviewedAt = now; } }); }
   } catch (e) { hot.lastError = e.message; console.error('hot scan', e.message); }
-  try { hot.showhn = await showHn(); } catch (e) { console.error('showhn', e.message); }
   hot.running = false; saveHot();
-  if (!hot.lastError) analyzeHot(callScout).catch(e => console.error('auto analyze', e.message)); // patterns refresh after every new scan
   return hot;
+}
+
+// "Check my area" for one hot find: 2 web searches (~$0.025)
+async function checkLocal(name, { auto = false } = {}) {
+  const it = hot.items.find(i => i.name.toLowerCase() === String(name || '').toLowerCase());
+  if (!it) throw new Error('That hot find is no longer in the list');
+  const where = hot.area || DEFAULT_AREA;
+  const ask = `Check whether ${where} already has this business: "${it.name}" — ${it.pitch}. Use at most 2 searches (e.g. "<service> near Brockton MA", "<service> South Shore MA"). Return ONLY JSON: {"local_competitors": ["names actually found, max 4"], "local_gap": "1 sentence: is there an opening here and why", "evidence": [{"claim": "...", "url": "https://..."}]}`;
+  const raw = await ai({ system: NICHE_SYSTEM_PROMPT, ask, maxTokens: 800, searches: 2, auto, purpose: 'Check my area' });
+  const d = extractJson(raw);
+  const str = (v, m) => String(v || '').slice(0, m);
+  it.local_competitors = (Array.isArray(d.local_competitors) ? d.local_competitors : []).map(c => str(c, 80)).filter(Boolean).slice(0, 4);
+  it.local_gap = str(d.local_gap, 300) || it.local_gap;
+  it.local_checked = true; it.localCheckedAt = new Date().toISOString();
+  const ev = (Array.isArray(d.evidence) ? d.evidence : []).filter(e => e && /^https?:\/\//.test(e.url || '')).slice(0, 3);
+  it.evidence = [...(it.evidence || []), ...ev].slice(0, 8);
+  saveHot();
+  return it;
 }
 
 // ---------------------------------------------------------------------------
@@ -292,7 +392,7 @@ function cleanAnalysis(raw, hotNames) {
   return { clusters, angles, gaps };
 }
 
-async function analyzeHot(callScout, { force = false, board } = {}) {
+async function analyzeHot({ force = false, board, auto = false } = {}) {
   if (Array.isArray(board)) hot.board = board.slice(0, 80).map(b => ({ name: String(b.name || '').slice(0, 80), pitch: String(b.pitch || '').slice(0, 160), status: String(b.status || '').slice(0, 20) }));
   const a = hot.analysis;
   if (hot.analyzing) return { analysis: a, running: true };
@@ -311,10 +411,10 @@ ${mine}
 
 Analyze the finds as a set, not one by one:
 1. "clusters": groups of 2+ finds that are really the same underlying pattern (same buyer pain, same mechanism or same trend). Use the exact find names in "members". Say what the pattern is and why it is happening now.
-2. "blind_angles": up to 6 businesses that NONE of the finds or my ideas already are, but that the patterns point to. Look for: picks-and-shovels (sell to the operators riding a trend), the B2B version of a consumer find (or vice versa), a combination of two finds, a local version for ${hot.area || DEFAULT_AREA}, an ignored customer segment, a feature every player is missing. Search the web to check each one is actually unserved or weakly served and cite it. Score each with the normal niche fields and scoring, plus "angle_type" (one of: ${ANGLE_TYPES.join(', ')}), "built_from" (find names it comes from), "why_unserved" (1 sentence).
+2. "blind_angles": up to 5 businesses that NONE of the finds or my ideas already are, but that the patterns point to. Look for: picks-and-shovels (sell to the operators riding a trend), the B2B version of a consumer find (or vice versa), a combination of two finds, a local version for ${hot.area || DEFAULT_AREA}, an ignored customer segment, a feature every player is missing. You have only 2 web searches: use them on the 2 most promising angles to check they are unserved, and cite them. For the others, say in \"why_unserved\" that it is not yet verified. Score each with the normal niche fields and scoring, plus "angle_type" (one of: ${ANGLE_TYPES.join(', ')}), "built_from" (find names it comes from), "why_unserved" (1 sentence).
 3. "gaps": specific holes inside the hot finds — complaints about the leaders, missing features, price points nobody offers, regions or segments not covered. Each: "gap", "seen_in" (find names), "how_to_use" (1 sentence on how I could exploit it with my constraints).
 Return ONLY raw JSON: {"clusters":[{"name","pattern","why_now","members":[...]}],"blind_angles":[niche objects with the extra fields],"gaps":[{"gap","seen_in":[...],"how_to_use"}]}`;
-    const raw = await callScout([{ role: 'user', content: ask }], 9000, 12, NICHE_SYSTEM_PROMPT);
+    const raw = await ai({ system: NICHE_SYSTEM_PROMPT, ask, maxTokens: 6000, searches: 2, auto, purpose: 'Pattern analysis' }); // ~$0.03
     const parsed = extractJson(raw);
     const clean = cleanAnalysis(Array.isArray(parsed) ? {} : parsed, hot.items.map(i => i.name));
     if (!clean.clusters.length && !clean.angles.length && !clean.gaps.length) throw new Error('Analysis came back empty');
@@ -325,35 +425,47 @@ Return ONLY raw JSON: {"clusters":[{"name","pattern","why_now","members":[...]}]
   return { analysis: hot.analysis, error: hot.analysisError };
 }
 
-function hotStatus() { return { ...hot, board: undefined, scanEveryHours: hotHours() }; }
+function hotStatus() { return { ...hot, board: undefined, scanEveryHours: hotHours(), aiOn: !!process.env.ANTHROPIC_API_KEY, budget: require('./aibudget').budgetStatus(), settings: getSettings() }; }
 function hotHours() { const h = Number(process.env.HOT_SCAN_HOURS ?? 24); return isFinite(h) && h >= 0 ? h : 24; }
 
-async function hotRequest(callScout, { area, force, hasKey }) {
+async function hotRequest({ area, force, feeds }) {
   const areaChanged = area && area !== hot.area;
-  if (hasKey && (force || areaChanged) && !hot.running) {
-    if (!areaChanged && Date.now() - hot.at < HOT_MIN_FORCE_MS) return { ...hotStatus(), aiOn: true, note: 'Scanned less than an hour ago — showing that scan.' };
-    await scanHot(callScout, area);
+  if ((force || areaChanged) && !hot.running) {
+    if (!areaChanged && hot.lastMode === 'deep' && Date.now() - hot.at < HOT_MIN_FORCE_MS) return { ...hotStatus(), note: 'Deep-scanned less than an hour ago — showing that scan.' };
+    await scanHot(area, { mode: 'deep' });
+  } else if (feeds && Date.now() - (hot.feedAt || 0) > 30 * 60 * 1000) {
+    await fetchFeeds().catch(e => console.error('feeds', e.message)); // free
   } else if (!hot.showhn.length) {
     try { hot.showhn = await showHn(); } catch (_) {}
   }
-  return { ...hotStatus(), aiOn: !!hasKey };
+  return hotStatus();
 }
 
-function startHotScanner(callScout, hasKey) {
+async function writeUp(ids) { await scanHot(null, { mode: 'free', ids: Array.isArray(ids) ? ids.map(String).slice(0, 40) : null }); return hotStatus(); }
+
+// Daily job. The feed pull is free and always runs; the paid steps run only if switched on.
+function startHotScanner(hasKey) {
   const hours = hotHours();
-  if (!hasKey || !hours) { console.log('Hot-ideas scanner off', hasKey ? '(HOT_SCAN_HOURS=0)' : '(no ANTHROPIC_API_KEY)'); return; }
+  if (!hours) { console.log('Daily feed pull off (HOT_SCAN_HOURS=0)'); return; }
   const every = hours * 3600 * 1000;
-  const setNext = () => { hot.nextAt = hot.at ? hot.at + every : Date.now() + 30000; };
+  const setNext = () => { hot.nextAt = (hot.feedAt || Date.now()) + every; };
   const check = async () => {
-    const backoff = hot.lastError && Date.now() - (hot.lastTryAt || 0) < 3 * 3600 * 1000; // failed scan → wait 3h, don't burn credits
-    if (!hot.running && !backoff && Date.now() - hot.at >= every) await scanHot(callScout);
+    if (Date.now() - (hot.feedAt || 0) < every) return setNext();
+    try { await fetchFeeds(); } catch (e) { console.error('feeds', e.message); }
+    if (hasKey) {
+      const st = getSettings();
+      try {
+        if (st.autoWriteup && hot.feed.some(f => !f.reviewed)) await scanHot(null, { mode: 'free', auto: true });
+        if (st.autoLocalTop > 0) for (const it of hot.items.filter(i => i.local_checked === false).sort((a, b) => b.total - a.total).slice(0, st.autoLocalTop)) await checkLocal(it.name, { auto: true });
+        if (st.autoAnalyzeDays > 0 && hot.items.length && (!hot.analysis || Date.now() - hot.analysis.at >= st.autoAnalyzeDays * 86400000)) await analyzeHot({ auto: true });
+      } catch (e) { console.error('auto paid job stopped:', e.message); }
+    }
     setNext();
   };
   setNext();
-  // Check soon after boot (stale saved scan → scan now), then every 15 minutes.
   setTimeout(check, 30000).unref();
   setInterval(check, 15 * 60 * 1000).unref();
 }
 
-module.exports = { discover, evaluate, signals, cleanNiche, extractJson, NICHE_SYSTEM_PROMPT, hotRequest, startHotScanner, scanHot, analyzeHot, DEFAULT_AREA };
+module.exports = { discover, evaluate, signals, cleanNiche, extractJson, NICHE_SYSTEM_PROMPT, hotRequest, startHotScanner, scanHot, analyzeHot, checkLocal, writeUp, getSettings, setSettings, DEFAULT_AREA };
 

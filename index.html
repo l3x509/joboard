@@ -137,6 +137,7 @@
   }
   .scout-send-btn:disabled { opacity: .4; cursor: default; }
   .api-status { font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); }
+  .api-status.warn { color: var(--amber); }
   .toast {
     position: fixed; top: 62px; right: 18px; background: var(--panel-2); border: 1px solid var(--teal);
     color: var(--text); font-family: var(--mono); font-size: 11.5px; padding: 8px 14px; border-radius: 6px;
@@ -319,6 +320,9 @@
   .hsub { font-family: var(--mono); font-size: 11px; color: var(--text); margin: 16px 0 8px; text-transform: uppercase; letter-spacing: .06em; }
   .hsub .dim { text-transform: none; letter-spacing: 0; }
   .hot-analysis { background: var(--panel-2, var(--panel)); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+  .feed-done { opacity: .55; }
+  .auto-paid { display: grid; gap: 8px; }
+  .auto-paid .bcheck { flex-wrap: wrap; }
   .hot-meta { display: grid; gap: 4px; font-size: 12px; color: var(--text-dim); line-height: 1.45; }
   .hot-meta .dim, .dim { color: var(--text-faint); }
   .warn { color: var(--amber); }
@@ -655,7 +659,7 @@
     <div class="topbar-right">
       <span class="api-status job-only" id="apiStatus">Checking connection…</span>
       <span class="api-status biz-only" id="bizStatus">Business data not refreshed yet</span>
-      <button class="tb-btn biz-only" id="bizRefreshBtn" title="Reload hot finds, Show HN launches, your last signal search, and re-run the pattern analysis if there are new finds. Does not start a paid web scan.">🔄 Refresh Business</button>
+      <button class="tb-btn biz-only" id="bizRefreshBtn" title="Free: pulls the latest feed items, reloads hot finds, Show HN launches, your last signal search and the AI spend meter. Never starts a paid AI call.">🔄 Refresh Business</button>
       <button class="tb-btn job-only" id="fetchLiveBtn">🔄 Refresh Live</button>
       <button class="tb-btn job-only" id="checkAllBtn">⚡ Check All Boards</button>
       <button class="tb-btn scout" id="openScoutBtn">💬 Ask the Scout</button>
@@ -1295,7 +1299,7 @@
     { id: '__niche_find__', icon: '⌕', label: 'Find niches', title: 'Find Niches', secs: ['find'], sub: 'Scout searches the web for online businesses that fit your skills, code and capacity, and backs every demand claim with a link.' },
     { id: '__niche_score__', icon: '✎', label: 'Score an idea', title: 'Score an Idea', secs: ['score', 'shortlist'], sub: 'Type an idea you already have. Scout checks demand and competitors and scores it against your assets.' },
     { id: '__niche_map__', icon: '⊞', label: 'Overlaps', title: 'Idea Overlaps', secs: ['map'], sub: 'Every idea tagged by what it would take to build, how it earns, who pays and how well it fits you. Filter, then look for ideas that share a build: one codebase can test several of them.' },
-    { id: '__niche_hot__', icon: '▲', label: 'Hot to replicate', title: 'Hot Ideas to Replicate', secs: ['hot'], sub: 'The server scans the web every day for businesses taking off somewhere else and checks whether your area has one yet. New finds stack up between visits.' },
+    { id: '__niche_hot__', icon: '▲', label: 'Hot to replicate', title: 'Hot Ideas to Replicate', secs: ['hot'], sub: 'Free feeds (Show HN, Product Hunt, Google News) are pulled every day. You choose what to write up, check against your area, or analyze. Every paid button shows its price, and nothing paid runs unless you click it.' },
     { id: '__niche_signals__', icon: '◉', label: 'Live signals', title: 'Live Signals', secs: ['signals'], sub: 'People asking for tools and services right now. Turn any post into an idea to score.' },
   ];
   const isBizView = id => typeof id === 'string' && id.startsWith('__niche');
@@ -1516,6 +1520,7 @@
   async function nicheApi(path, body) {
     const r = await fetch(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
     const d = await r.json().catch(() => ({}));
+    if (d && d.budget && typeof setBudget === 'function') setBudget(d.budget);
     if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
     return d;
   }
@@ -1674,7 +1679,7 @@
   function shortlistActions(n) {
     return `<div class="niche-actions">
       <select data-nsel="${n.id}" aria-label="Status for ${escapeAttr(n.name)}">${NICHE_STATUSES.filter(s => s !== 'Testing' && s !== 'Building').concat(['Testing', 'Building'].includes(n.status) ? [n.status] : []).map(s => `<option ${s === n.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
-      ${typeof n.total !== 'number' ? `<button class="curated-collapse-btn" data-nscore="${n.id}" ${nicheBusy ? 'disabled' : ''}>Score it</button>` : ''}
+      ${typeof n.total !== 'number' ? `<button class="curated-collapse-btn" data-nscore="${n.id}" ${nicheBusy ? 'disabled' : ''} title="Haiku + 3 web searches, about $0.04">Score it</button>` : ''}
       ${!['Killed', 'Won', 'Testing', 'Building'].includes(n.status) ? `<button class="curated-collapse-btn" data-nstart="${n.id}">▶ Start 2-week test</button>` : ''}
       <button class="curated-collapse-btn" data-ndel="${n.id}">Delete</button>
     </div>`;
@@ -1800,36 +1805,45 @@
   const NICHE_HOT_VISIT_KEY = 'niche-hot-visit-v1';
   let nicheHot = loadJSON(NICHE_HOT_KEY, null);
   let nicheHotFetched = 0;
+  let hotFeedLimit = 20;
   const HOT_VIEW_KEY = 'hot-view-v1';
   let hotView = Object.assign({ q: '', sort: 'new', onlyOverlap: false, openOnly: false, onlyNew: false }, loadJSON(HOT_VIEW_KEY, {}));
   let hotVisitPrev = null;   // last visit before this session's first look — 'new' is relative to it
   let hotBgFetch = false;
-  let hotAutoAnalyzed = false;
   const hotNewCount = () => { const v = loadJSON(NICHE_HOT_VISIT_KEY, ''); return nicheHot && nicheHot.items ? nicheHot.items.filter(i => !v || (i.firstSeen || '') > v).length : 0; };
 
-  async function fetchHot({ refresh = false, area = '' } = {}) {
-    const qs = new URLSearchParams(); if (refresh) qs.set('refresh', 'true'); if (area) qs.set('area', area);
+  async function fetchHot({ refresh = false, area = '', feeds = false } = {}) {
+    const qs = new URLSearchParams(); if (refresh) qs.set('refresh', 'true'); if (area) qs.set('area', area); if (feeds) qs.set('feeds', 'true');
     const d = await nicheApi('/api/niche/hot?' + qs.toString());
-    nicheHot = d; nicheHotFetched = Date.now(); saveJSON(NICHE_HOT_KEY, d); return d;
+    nicheHot = d; nicheHotFetched = Date.now(); saveJSON(NICHE_HOT_KEY, d); setBudget(d.budget); return d;
   }
 
   async function requestHotAnalysis(force) {
     const board = loadNiches().map(n => ({ name: n.name, pitch: n.description || n.pitch || '', status: n.status }));
     const d = await nicheApi('/api/niche/hot/analyze', { force, board });
     if (nicheHot) { if (d.analysis) nicheHot.analysis = d.analysis; nicheHot.analysisError = d.error || null; saveJSON(NICHE_HOT_KEY, nicheHot); }
+    setBudget(d.budget);
     return d;
   }
 
   // ===== Business refresh (independent of the Jobs "Refresh Live") =====
   const BIZ_REFRESHED_KEY = 'biz-refreshed-v1';
   let bizRefreshing = false;
+  let bizBudget = loadJSON('biz-budget-v1', null);
+  function setBudget(b) { if (b && typeof b.spent === 'number') { bizBudget = b; saveJSON('biz-budget-v1', b); updateBizStatus(); } }
+  const usd = v => '$' + (v < 0.1 && v > 0 ? v.toFixed(3) : v.toFixed(2));
   function updateBizStatus(msg) {
     const el = document.getElementById('bizStatus'); if (!el) return;
     if (msg) { el.textContent = msg; return; }
     const at = loadJSON(BIZ_REFRESHED_KEY, 0);
     const n = nicheHot && nicheHot.items ? nicheHot.items.length : 0;
-    el.textContent = at ? `Business updated ${new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · ${n} hot finds` : 'Business data not refreshed yet';
+    const b = bizBudget;
+    const spend = b ? ` · AI ${usd(b.spent)} of ${usd(b.budget)} this month` : '';
+    el.textContent = (at ? `Updated ${new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · ${n} hot finds` : `${n} hot finds`) + spend;
+    el.classList.toggle('warn', !!(b && b.spent >= b.budget * 0.8));
+    el.title = b ? `Business AI spend, ${b.month}: ${usd(b.spent)} of a ${usd(b.budget)} cap (automatic jobs stop at ${usd(b.autoCap)}). Model ${b.model}. ${b.searches} web searches.${b.persistent ? '' : ' Warning: DATA_DIR is not set, so the counter resets on every redeploy.'}` : '';
   }
+  function refreshBudget() { nicheApi('/api/niche/budget').then(setBudget).catch(() => {}); }
   async function refreshBusiness({ quiet = false } = {}) {
     if (bizRefreshing) return;
     bizRefreshing = true;
@@ -1839,15 +1853,12 @@
     const before = nicheHot && nicheHot.items ? nicheHot.items.length : 0;
     const problems = [];
     await Promise.all([
-      fetchHot().catch(e => problems.push('hot finds: ' + e.message)),
+      fetchHot({ feeds: true }).catch(e => problems.push('hot finds: ' + e.message)),
+      nicheApi('/api/niche/budget').then(setBudget).catch(() => {}),
       nicheSignals ? nicheApi('/api/niche/signals?refresh=true&q=' + encodeURIComponent(nicheSignals.q || '')).then(d => { nicheSignals = { ...d, q: nicheSignals.q }; }).catch(e => problems.push('signals: ' + e.message)) : null,
     ]);
     const n = nicheHot && nicheHot.items ? nicheHot.items.length : 0;
-    let analyzed = false;
-    if (n && nicheHot.aiOn !== false && !nicheHot.analyzing && (!nicheHot.analysis || nicheHot.analysis.basedOn !== n)) {
-      updateBizStatus('Analyzing new hot finds…');
-      try { await requestHotAnalysis(false); analyzed = true; } catch (e) { problems.push('analysis: ' + e.message); }
-    }
+    const analyzed = false; // free refresh: never triggers a paid AI call
     saveJSON(BIZ_REFRESHED_KEY, Date.now());
     bizRefreshing = false;
     if (btn) { btn.disabled = false; btn.textContent = '🔄 Refresh Business'; }
@@ -1867,25 +1878,25 @@
     const board = list.filter(n => n.status !== 'Killed');
     const all = h && h.items ? h.items.map(n => ({ ...n, _new: (n.firstSeen || '') > visit, _m: boardMatches(n, board) })) : [];
     const q = hotView.q.trim().toLowerCase();
-    let items = all.filter(n => (!q || `${n.name} ${n.pitch} ${n.where} ${n.why_hot} ${n.local_gap}`.toLowerCase().includes(q)) && (!hotView.onlyOverlap || n._m.length) && (!hotView.onlyNew || n._new) && (!hotView.openOnly || !(n.local_competitors || []).length));
+    let items = all.filter(n => (!q || `${n.name} ${n.pitch} ${n.where} ${n.why_hot} ${n.local_gap}`.toLowerCase().includes(q)) && (!hotView.onlyOverlap || n._m.length) && (!hotView.onlyNew || n._new) && (!hotView.openOnly || (n.local_checked !== false && !(n.local_competitors || []).length)));
     const sorters = { new: (a, b) => (b._new - a._new) || (b.firstSeen || '').localeCompare(a.firstSeen || '') || b.total - a.total, score: (a, b) => b.total - a.total, overlap: (a, b) => (b._m.length ? b._m[0].common.length : 0) - (a._m.length ? a._m[0].common.length : 0) || b._m.length - a._m.length || b.total - a.total };
     items.sort(sorters[hotView.sort] || sorters.new);
     // Overlap summary across ALL hot finds
     const buildRows = BIZ_DIMS[0].tags.map(([t]) => [t, all.filter(n => nicheTags(n).build.includes(t)).length, buildCounts[t] || 0]).filter(r => r[1]).sort((a, b) => b[1] - a[1]);
     const bmax = Math.max(1, ...buildRows.map(r => r[1]));
     const linked = all.filter(n => n._m.length);
-    const openLocal = all.filter(n => !(n.local_competitors || []).length).length;
+    const openLocal = all.filter(n => n.local_checked !== false && !(n.local_competitors || []).length).length;
     return `
       <div class="niche-form">
         <input id="hArea" placeholder="Area to replicate in" value="${escapeAttr(h && h.area || 'South Shore Massachusetts and greater Boston')}" style="flex:2">
-        <button class="tb-btn primary" id="hScan" ${nicheBusy ? 'disabled' : ''}>${nicheBusy === 'hot' ? 'Scanning the web… (1–2 minutes)' : 'Scan now'}</button>
+        <button class="tb-btn primary" id="hScan" ${nicheBusy ? 'disabled' : ''}>${nicheBusy === 'hot' ? 'Scanning the web… (1–2 minutes)' : 'Deep web scan (~$0.06)'}</button>
       </div>
-      <div class="niche-sub">${h ? `${h.aiOn === false ? '<b class="warn">Web scanning is off: ANTHROPIC_API_KEY is not set on the server.</b> ' : ''}${h.scanEveryHours ? `Auto-scans every ${h.scanEveryHours} h on the server` : 'Auto-scan is off (HOT_SCAN_HOURS=0)'} · last scan ${fmt(h.at)}${h.nextAt && h.scanEveryHours ? ` · next about ${fmt(h.nextAt)}` : ''} · keeps every find${h.running ? ' · <b>scan running now</b>' : ''}${h.note ? ` · ${escapeHtml(h.note)}` : ''}${h.lastError ? `<br><span class="warn">Last scan failed: ${escapeHtml(h.lastError)}</span>` : ''}` : 'Loading…'}</div>
+      <div class="niche-sub">${h ? `${h.aiOn === false ? '<b class="warn">Web scanning is off: ANTHROPIC_API_KEY is not set on the server.</b> ' : ''}${h.scanEveryHours ? `Feeds pulled free every ${h.scanEveryHours} h (Show HN, Product Hunt, Google News)` : 'Daily feed pull is off (HOT_SCAN_HOURS=0)'} · last pull ${fmt(h.feedAt)}${h.nextAt && h.scanEveryHours ? ` · next about ${fmt(h.nextAt)}` : ''} · last write-up or deep scan ${fmt(h.at)} · nothing paid runs unless you click it${h.settings && (h.settings.autoWriteup || h.settings.autoLocalTop || h.settings.autoAnalyzeDays) ? ' <b class="warn">(some paid automation is ON, see the bottom of this page)</b>' : ''} · keeps every find${h.running ? ' · <b>scan running now</b>' : ''}${h.note ? ` · ${escapeHtml(h.note)}` : ''}${h.lastError ? `<br><span class="warn">Last scan failed: ${escapeHtml(h.lastError)}</span>` : ''}` : 'Loading…'}</div>
 
       ${all.length ? `<div class="isec"><div class="ikpis">
         <div class="ik accent"><div class="ik-v">${all.length}</div><div class="ik-l">hot finds kept</div><div class="ik-n">${all.filter(n => n._new).length} new since last visit</div></div>
         <div class="ik ${linked.length ? 'good' : ''}"><div class="ik-v">${linked.length}</div><div class="ik-l">overlap your board</div><div class="ik-n">share 2+ build, model or buyer tags</div></div>
-        <div class="ik"><div class="ik-v">${openLocal}</div><div class="ik-l">no local competitor found</div></div>
+        <div class="ik"><div class="ik-v">${openLocal}</div><div class="ik-l">no local competitor found</div><div class="ik-n">${all.filter(n => n.local_checked === false).length} not checked yet</div></div>
         <div class="ik"><div class="ik-v">${all.filter(n => fitsConstraints(nicheTags(n))).length}</div><div class="ik-l">fit your constraints</div></div>
       </div></div>
       <div class="isec igrid">
@@ -1896,9 +1907,9 @@
           <button class="curated-collapse-btn" id="hAnalyze" style="margin-top:8px">Analyze all hot finds in Overlaps →</button></div>
       </div>` : ''}
 
-      ${all.length ? (() => { const an = h.analysis; const stale = an && an.basedOn !== all.length; return `<div class="isec hot-analysis"><div class="isec-h">Patterns, blind angles &amp; gaps <span class="isec-sub">Scout reads all ${all.length} finds together and checks each angle on the web · refreshes after every scan</span></div>
+      ${all.length ? (() => { const an = h.analysis; const stale = an && an.basedOn !== all.length; return `<div class="isec hot-analysis"><div class="isec-h">Patterns, blind angles &amp; gaps <span class="isec-sub">Scout reads all ${all.length} finds together and spot-checks the top 2 angles on the web · runs only when you click</span></div>
         <div class="niche-form" style="align-items:center">
-          <button class="tb-btn ${an ? '' : 'primary'}" id="hAnalyzeRun" ${nicheBusy || h.analyzing ? 'disabled' : ''}>${nicheBusy === 'analyze' || h.analyzing ? 'Analyzing all finds… (1–2 minutes)' : an ? (stale ? `Re-analyze (${all.length - an.basedOn > 0 ? all.length - an.basedOn + ' new finds' : 'finds changed'})` : 'Re-analyze') : 'Find patterns, blind angles & gaps'}</button>
+          <button class="tb-btn ${an ? '' : 'primary'}" id="hAnalyzeRun" ${nicheBusy || h.analyzing ? 'disabled' : ''}>${nicheBusy === 'analyze' || h.analyzing ? 'Analyzing all finds… (1–2 minutes)' : an ? (stale ? `Re-analyze ${all.length - an.basedOn > 0 ? all.length - an.basedOn + ' new finds ' : ''}(~$0.03)` : 'Re-analyze (~$0.03)') : 'Find patterns, blind angles & gaps (~$0.03)'}</button>
           <span class="niche-sub" style="margin:0">${an ? `Last analysis ${new Date(an.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · based on ${an.basedOn} finds` : 'Not analyzed yet.'}${h.analysisError ? ` · <span class="warn">last try failed: ${escapeHtml(h.analysisError)}</span>` : ''}</span>
         </div>
         ${an ? `
@@ -1918,6 +1929,18 @@
             <div class="adv-actions"><button class="curated-collapse-btn" data-hgap="${i}">Score as idea</button></div></div>`).join('')}</div>` : ''}` : ''}
       </div>`; })() : ''}
 
+      ${(() => { const fd = (h && h.feed) || []; const fresh = fd.filter(f => !f.reviewed); const shown = [...fresh, ...fd.filter(f => f.reviewed)].slice(0, hotFeedLimit);
+        return `<div class="isec"><div class="isec-h">From the feeds (${fresh.length} new) <span class="isec-sub">free · raw items from Show HN, Product Hunt and Google News · write up the ones worth a look</span></div>
+        <div class="niche-form" style="align-items:center">
+          <button class="tb-btn ${fresh.length ? 'primary' : ''}" id="hWriteAll" ${!fresh.length || nicheBusy ? 'disabled' : ''} title="Haiku reads the new items and turns the promising ones into hot finds. No web search.">${nicheBusy === 'writeup' ? 'Writing up…' : `Write up all ${Math.min(40, fresh.length)} new (~$${(0.0015 + 0.0001 * Math.min(40, fresh.length)).toFixed(3)})`}</button>
+          <span class="niche-sub" style="margin:0">Pick single items below for ~$0.001 each. Written-up finds start with an unverified local check.</span>
+        </div>
+        ${shown.length ? `<div class="niche-signals">${shown.map(f => `<div class="adv-row ${f.reviewed ? 'feed-done' : ''}"><div><a target="_blank" rel="noopener" href="${escapeAttr(f.url)}">${escapeHtml(f.title)}</a><span class="adv-reason">${escapeHtml(f.feed)}</span>
+          ${f.snippet ? `<small>${escapeHtml(f.snippet)}</small>` : ''}<small>${f.reviewed ? 'reviewed' : 'new'} · ${postedAgoLabel(f.firstSeen).replace(/^Posted/, 'pulled')}</small></div>
+          <div class="adv-actions">${f.reviewed ? '' : `<button class="curated-collapse-btn" data-hwrite="${escapeAttr(f.id)}" ${nicheBusy ? 'disabled' : ''}>Write up (~$0.001)</button>`}</div></div>`).join('')}</div>
+          ${fd.length > hotFeedLimit ? `<button class="curated-collapse-btn" id="hFeedMore" style="margin-top:8px">Show more feed items</button>` : ''}` : '<div class="pane-empty">No feed items yet. Click <b>Refresh Business</b> (free) to pull them.</div>'}
+        </div>`; })()}
+
       <div class="isec"><div class="isec-h">Hot ideas to replicate (${items.length}${items.length !== all.length ? ` of ${all.length}` : ''})</div>
         <div class="niche-form">
           <input id="hQ" placeholder="Search hot finds…" value="${escapeAttr(hotView.q)}">
@@ -1934,12 +1957,19 @@
               ${n.where ? `<div><span class="dim">Working in:</span> ${escapeHtml(n.where)}</div>` : ''}
               ${n.why_hot ? `<div><span class="dim">Why hot:</span> ${escapeHtml(n.why_hot)}</div>` : ''}
               ${n.local_gap ? `<div><span class="dim">Your area:</span> ${escapeHtml(n.local_gap)}</div>` : ''}
-              <div><span class="dim">Local competitors:</span> ${n.local_competitors && n.local_competitors.length ? n.local_competitors.map(c => `<span class="itag">${escapeHtml(c)}</span>`).join(' ') : '<span class="itag on">none found</span>'}</div>
+              <div><span class="dim">Local competitors:</span> ${n.local_checked === false ? `<span class="itag">not checked yet</span> <button class="curated-collapse-btn" data-hcheck="${escapeAttr(n.name)}" ${nicheBusy ? 'disabled' : ''} title="Haiku + 2 web searches, about $0.03">${nicheBusy === 'check:' + n.name ? 'Checking…' : 'Check my area (~$0.03)'}</button>` : n.local_competitors && n.local_competitors.length ? n.local_competitors.map(c => `<span class="itag">${escapeHtml(c)}</span>`).join(' ') : '<span class="itag on">none found</span>'}</div>
               ${n.launch_cost ? `<div><span class="dim">Launch cost:</span> ${escapeHtml(n.launch_cost)}</div>` : ''}
               ${n._m.length ? `<div class="inc-t">Overlaps your ${n._m.slice(0, 2).map(x => escapeHtml(x.idea.name)).join(' and ')}${n._m.length > 2 ? ` +${n._m.length - 2}` : ''} (${n._m[0].common.map(k => escapeHtml(k.split(':')[1])).join(', ')})</div>` : plugs.length ? `<div class="inc-t">Shares a build with ${plugs.map(t => `${escapeHtml(t)} (${buildCounts[t]} of your ideas)`).join(', ')}</div>` : ''}
             </div>`, actions: `<div class="niche-actions">${saved.has(n.name.toLowerCase()) ? '<span class="itag on">on your board</span>' : `<button class="curated-collapse-btn" data-hsave="${escapeAttr(n.name)}">+ Add to board</button>`}<span class="dim" style="font-size:11px">${n.firstSeen ? postedAgoLabel(n.firstSeen).replace(/^Posted/, 'Found') : ''}</span></div>` });
-        }).join('')}</div>${items.length > bizHotLimit ? `<button class="curated-collapse-btn" id="hMore" style="margin-top:10px">Show ${Math.min(30, items.length - bizHotLimit)} more of ${items.length - bizHotLimit}</button>` : ''}` : all.length ? '<div class="pane-empty">No hot finds match these filters.</div>' : `<div class="pane-empty">${h && h.aiOn === false ? 'Add ANTHROPIC_API_KEY in Railway to turn on web scanning.' : 'No scan yet. Click <b>Scan now</b> or wait for the daily auto-scan.'}</div>`}
+        }).join('')}</div>${items.length > bizHotLimit ? `<button class="curated-collapse-btn" id="hMore" style="margin-top:10px">Show ${Math.min(30, items.length - bizHotLimit)} more of ${items.length - bizHotLimit}</button>` : ''}` : all.length ? '<div class="pane-empty">No hot finds match these filters.</div>' : `<div class="pane-empty">${h && h.aiOn === false ? 'Add ANTHROPIC_API_KEY in Railway to write up finds.' : 'No hot finds yet. Write up items from the feeds above, or run a <b>Deep web scan</b>.'}</div>`}
       </div>
+
+      ${h ? (() => { const st = h.settings || {}; return `<div class="isec auto-paid"><div class="isec-h">Paid automation <span class="isec-sub">all off by default · runs once a day on the server · counts toward your monthly cap${bizBudget ? ` (${usd(bizBudget.spent)} of ${usd(bizBudget.budget)} used)` : ''}</span></div>
+        <label class="bcheck"><input type="checkbox" id="sAutoWrite" ${st.autoWriteup ? 'checked' : ''}> Write up new feed items automatically <span class="dim">· ~$0.06/month</span></label>
+        <label class="bcheck">Check my area automatically for the top <select id="sAutoLocal" class="bsel">${[0, 1, 3, 5].map(v => `<option value="${v}" ${Number(st.autoLocalTop) === v ? 'selected' : ''}>${v ? v : 'no'}</option>`).join('')}</select> unchecked finds each day <span class="dim">· ~$0.75/month per find</span></label>
+        <label class="bcheck">Re-run patterns, blind angles &amp; gaps every <select id="sAutoAnalyze" class="bsel">${[0, 2, 3, 7].map(v => `<option value="${v}" ${Number(st.autoAnalyzeDays) === v ? 'selected' : ''}>${v ? v + ' days' : 'never (manual)'}</option>`).join('')}</select> <span class="dim">· ~$0.03 per run</span></label>
+        <div class="inote">Automatic jobs can use at most ${bizBudget ? usd(bizBudget.autoCap) : '60% of the cap'} a month, so your own clicks always have room.</div>
+      </div>`; })() : ''}
 
       <div class="isec"><div class="isec-h">Launches getting traction this week <span class="isec-sub">Show HN posts with 40+ points in the last 10 days · free, no key</span></div>
         ${h && h.showhn && h.showhn.length ? `<div class="niche-signals">${h.showhn.map((s, i) => `<div class="adv-row"><div><a target="_blank" rel="noopener" href="${escapeAttr(s.url)}">${escapeHtml(s.title)}</a><span class="adv-reason">Show HN</span>
@@ -1983,9 +2013,28 @@
       selectLane('__niche_score__'); showToast('Turn the gap into a business name, then click Score it');
     }));
     el.querySelectorAll('[data-hfind]').forEach(b => b.addEventListener('click', () => { hotView = { ...hotView, q: b.getAttribute('data-hfind'), onlyNew: false, onlyOverlap: false, openOnly: false }; saveJSON(HOT_VIEW_KEY, hotView); rerender(); const g = el.querySelector('#hQ'); if (g) g.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
-    // First look with finds but no (or stale) analysis → run it once, non-forced (server dedupes)
-    const an = nicheHot && nicheHot.analysis, n = nicheHot && nicheHot.items ? nicheHot.items.length : 0;
-    if (n && nicheHot.aiOn !== false && !nicheBusy && !nicheHot.analyzing && !hotAutoAnalyzed && (!an || an.basedOn !== n)) { hotAutoAnalyzed = true; runAnalysis(false); }
+    el.querySelectorAll('[data-hcheck]').forEach(b => b.addEventListener('click', async () => {
+      const name = b.getAttribute('data-hcheck'); nicheBusy = 'check:' + name; renderNiches(el);
+      try { const d = await nicheApi('/api/niche/hot/check', { name }); const i = nicheHot.items.findIndex(x => x.name === name); if (i >= 0) nicheHot.items[i] = d.item; saveJSON(NICHE_HOT_KEY, nicheHot); showToast(d.item.local_competitors.length ? `${name}: ${d.item.local_competitors.length} local competitor(s) found` : `${name}: no local competitor found`); }
+      catch (e) { showToast(`Check failed: ${e.message}`); }
+      nicheBusy = ''; rerender();
+    }));
+
+    const writeUp = async ids => {
+      nicheBusy = 'writeup'; renderNiches(el);
+      const before = (nicheHot.items || []).length;
+      try { const d = await nicheApi('/api/niche/hot/writeup', ids ? { ids } : {}); nicheHot = d; saveJSON(NICHE_HOT_KEY, d); setBudget(d.budget);
+        showToast(d.lastError ? 'Write-up failed: ' + d.lastError : `${d.items.length - before} new hot find(s) added`); }
+      catch (e) { showToast(`Write-up failed: ${e.message}`); }
+      nicheBusy = ''; rerender();
+    };
+    const wa = el.querySelector('#hWriteAll'); if (wa) wa.addEventListener('click', () => writeUp(null));
+    el.querySelectorAll('[data-hwrite]').forEach(b => b.addEventListener('click', () => writeUp([b.getAttribute('data-hwrite')])));
+    const fm = el.querySelector('#hFeedMore'); if (fm) fm.addEventListener('click', () => { hotFeedLimit += 40; rerender(); });
+    const saveSet = async patch => { try { const st = await nicheApi('/api/niche/settings', patch); nicheHot.settings = st; saveJSON(NICHE_HOT_KEY, nicheHot); showToast('Paid automation updated'); } catch (e) { showToast('Could not save: ' + e.message); } rerender(); };
+    const sw = el.querySelector('#sAutoWrite'); if (sw) sw.addEventListener('change', () => saveSet({ autoWriteup: sw.checked }));
+    const sl = el.querySelector('#sAutoLocal'); if (sl) sl.addEventListener('change', () => saveSet({ autoLocalTop: Number(sl.value) }));
+    const sa = el.querySelector('#sAutoAnalyze'); if (sa) sa.addEventListener('change', () => saveSet({ autoAnalyzeDays: Number(sa.value) }));
     const hm = el.querySelector('#hMore'); if (hm) hm.addEventListener('click', () => { bizHotLimit += 30; rerender(); });
     const goMap = tags => { bizFilter = { ...bizFilter, tags, q: '', fits: false, status: 'open', scope: 'hot', sort: 'overlap' }; saveBizFilter(); selectLane('__niche_map__'); };
     const ha = el.querySelector('#hAnalyze'); if (ha) ha.addEventListener('click', () => goMap([]));
@@ -2036,7 +2085,7 @@
         <div class="isec-h">Find niches <span class="isec-sub">Scout searches the web for demand evidence · a few cents per run · results saved 12 hours</span></div>
         <div class="niche-form">
           <input id="nFocus" placeholder="Optional focus, e.g. 'medical practices', 'rideshare drivers', 'printable templates', 'YouTube'" value="${escapeAttr(last && last.focus || '')}">
-          <button class="tb-btn primary" id="nDiscover" ${nicheBusy ? 'disabled' : ''}>${busy('discover') ? 'Researching… (about 1 minute)' : 'Find 6 niches'}</button>
+          <button class="tb-btn primary" id="nDiscover" ${nicheBusy ? 'disabled' : ''}>${busy('discover') ? 'Researching… (about 1 minute)' : 'Find 6 niches (~$0.05)'}</button>
         </div>
         ${last && last.items ? `<div class="niche-sub">Last run: ${new Date(last.at).toLocaleString()}${last.focus ? ` · focus "${escapeHtml(last.focus)}"` : ''}</div>
           <div class="niche-grid">${last.items.map((n, i) => nicheCardHtml(n, { actions: `<div class="niche-actions">${savedNames.has(n.name.toLowerCase()) ? '<span class="itag on">saved</span>' : `<button class="curated-collapse-btn" data-nsave="${i}">+ Save to shortlist</button>`}</div>` })).join('')}</div>` : ''}
@@ -2047,7 +2096,7 @@
         <div class="niche-form">
           <input id="nEvalName" placeholder="Idea name" value="${escapeAttr(nicheEvalDraft.name)}">
           <input id="nEvalDesc" placeholder="One line: who pays, for what" value="${escapeAttr(nicheEvalDraft.description)}" style="flex:2">
-          <button class="tb-btn" id="nEvaluate" ${nicheBusy ? 'disabled' : ''}>${busy('evaluate') ? 'Scoring…' : 'Score it'}</button>
+          <button class="tb-btn" id="nEvaluate" ${nicheBusy ? 'disabled' : ''}>${busy('evaluate') ? 'Scoring…' : 'Score it (~$0.04)'}</button>
         </div>
       </div>
 
@@ -2105,14 +2154,14 @@
     el.querySelectorAll('[data-nscore]').forEach(b => b.addEventListener('click', async () => {
       const n = loadNiches().find(x => x.id === b.getAttribute('data-nscore')); if (!n) return;
       nicheBusy = 'evaluate'; renderNiches(el);
-      try { const { item } = await nicheApi('/api/niche/evaluate', { idea: { name: n.name, description: n.description || n.pitch || '' } }); upsertNiche({ ...item, name: n.name, suggested: item.pitch, pitch: n.description || n.pitch || item.pitch }, n.source); showToast(`${n.name}: ${item.total}/100`); }
+      try { const { item } = await nicheApi('/api/niche/evaluate', { idea: { name: n.name, description: n.description || n.pitch || '' } }); upsertNiche({ ...item, name: n.name, suggested: item.pitch, pitch: n.description || n.pitch || item.pitch }, n.source); showToast(`${n.name}: ${item.total}/100`); refreshBudget(); }
       catch (e) { showToast(`Scoring failed: ${e.message}`); }
       nicheBusy = ''; rerender();
     }));
     const disc = el.querySelector('#nDiscover'); if (disc) disc.addEventListener('click', async () => {
       const focus = el.querySelector('#nFocus').value.trim();
       nicheBusy = 'discover'; renderNiches(el);
-      try { const d = await nicheApi('/api/niche/discover', { focus }); saveJSON(NICHE_LAST_KEY, { focus, at: d.at, items: d.items }); }
+      try { const d = await nicheApi('/api/niche/discover', { focus }); saveJSON(NICHE_LAST_KEY, { focus, at: d.at, items: d.items }); refreshBudget(); }
       catch (e) { showToast(`Research failed: ${e.message}`); }
       nicheBusy = ''; rerender();
     });
@@ -2120,7 +2169,7 @@
       nicheEvalDraft = { name: el.querySelector('#nEvalName').value.trim(), description: el.querySelector('#nEvalDesc').value.trim() };
       if (nicheEvalDraft.name.length < 2) { showToast('Give the idea a name first'); return; }
       nicheBusy = 'evaluate'; renderNiches(el);
-      try { const { item } = await nicheApi('/api/niche/evaluate', { idea: nicheEvalDraft }); upsertNiche({ ...item, name: nicheEvalDraft.name, description: nicheEvalDraft.description, suggested: item.pitch, pitch: nicheEvalDraft.description || item.pitch }, 'Your idea'); showToast(`${nicheEvalDraft.name}: ${item.total}/100 — saved to shortlist`); nicheEvalDraft = { name: '', description: '' }; }
+      try { const { item } = await nicheApi('/api/niche/evaluate', { idea: nicheEvalDraft }); upsertNiche({ ...item, name: nicheEvalDraft.name, description: nicheEvalDraft.description, suggested: item.pitch, pitch: nicheEvalDraft.description || item.pitch }, 'Your idea'); showToast(`${nicheEvalDraft.name}: ${item.total}/100 — saved to shortlist`); refreshBudget(); nicheEvalDraft = { name: '', description: '' }; }
       catch (e) { showToast(`Scoring failed: ${e.message}`); }
       nicheBusy = ''; rerender();
     });
