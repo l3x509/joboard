@@ -385,15 +385,17 @@ app.post('/api/scout', async (req, res) => {
 
 // ===== Business Niches =====
 // Scout research costs a few cents per run (web search + generation); cached 12h per focus.
+// All business AI calls run on Haiku 5.5 through aibudget.js (monthly cap, default $1).
+const aibudget = require('./aibudget');
+const bizErr = (res, e) => res.status(e.budget ? 402 : 502).json({ error: e.message, budget: aibudget.budgetStatus() });
+app.get('/api/niche/budget', (req, res) => res.json(aibudget.budgetStatus()));
 app.post('/api/niche/discover', async (req, res) => {
-  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on the server — add it in Railway → Variables.' });
-  try { res.json(await niche.discover(callScout, String(req.body.focus || '').slice(0, 120), req.body.forceRefresh === true)); }
-  catch (e) { res.status(502).json({ error: e.message }); }
+  try { res.json(await niche.discover(null, String(req.body.focus || '').slice(0, 120), req.body.forceRefresh === true)); }
+  catch (e) { bizErr(res, e); }
 });
 app.post('/api/niche/evaluate', async (req, res) => {
-  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on the server — add it in Railway → Variables.' });
-  try { res.json({ item: await niche.evaluate(callScout, req.body.idea || {}) }); }
-  catch (e) { res.status(502).json({ error: e.message }); }
+  try { res.json({ item: await niche.evaluate(null, req.body.idea || {}) }); }
+  catch (e) { bizErr(res, e); }
 });
 // Free live signals: Hacker News always; Reddit / YouTube only when their keys are set.
 app.get('/api/niche/signals', async (req, res) => {
@@ -403,16 +405,20 @@ app.get('/api/niche/signals', async (req, res) => {
 
 // Hot ideas to replicate locally: auto-scanned daily (HOT_SCAN_HOURS, 0 = off), plus Show HN launches.
 app.get('/api/niche/hot', async (req, res) => {
-  try { res.json(await niche.hotRequest(callScout, { area: String(req.query.area || '').slice(0, 160), force: req.query.refresh === 'true', hasKey: !!ANTHROPIC_API_KEY })); }
-  catch (e) { res.status(502).json({ error: e.message }); }
+  try { res.json(await niche.hotRequest({ area: String(req.query.area || '').slice(0, 160), force: req.query.refresh === 'true' })); }
+  catch (e) { bizErr(res, e); }
 });
 // Pattern analysis over all hot finds (clusters, blind angles, gaps). Body: { board: [{name,pitch,status}], force }
 app.post('/api/niche/hot/analyze', async (req, res) => {
-  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set on the server — add it in Railway → Variables.' });
-  try { res.json(await niche.analyzeHot(callScout, { force: req.body.force === true, board: req.body.board })); }
-  catch (e) { res.status(502).json({ error: e.message }); }
+  try { res.json({ ...(await niche.analyzeHot({ force: req.body.force === true, board: req.body.board })), budget: aibudget.budgetStatus() }); }
+  catch (e) { bizErr(res, e); }
 });
-niche.startHotScanner(callScout, !!ANTHROPIC_API_KEY);
+// "Check my area" for one hot find (2 web searches)
+app.post('/api/niche/hot/check', async (req, res) => {
+  try { res.json({ item: await niche.checkLocal(String(req.body.name || '').slice(0, 120)), budget: aibudget.budgetStatus() }); }
+  catch (e) { bizErr(res, e); }
+});
+niche.startHotScanner(!!ANTHROPIC_API_KEY);
 
 app.listen(PORT, () => {
   console.log(`Job board API listening on port ${PORT}`);
