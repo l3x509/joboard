@@ -106,8 +106,34 @@ const LANES = {
 const LANE_CAP = 60; // was 20 — relevant postings past #20 were silently dropped
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours — keeps Adzuna calls low on the free tier
 
-// In-memory cache: { [lane]: { fetchedAt, jobs: [...] } }
-const cache = {};
+// Lane cache, saved to DATA_DIR so redeploys don't burn Adzuna calls re-fetching everything.
+const fsx = require('fs'), pathx = require('path'), osx = require('os');
+const LANE_CACHE_FILE = pathx.join(process.env.DATA_DIR || osx.tmpdir(), 'opsboard-adzuna-cache.json');
+const cache = (() => { try { return JSON.parse(fsx.readFileSync(LANE_CACHE_FILE, 'utf8')); } catch (_) { return {}; } })();
+const laneFailures = {};
+function saveLaneCache() { try { fsx.writeFileSync(LANE_CACHE_FILE, JSON.stringify(cache)); } catch (e) { console.error('lane cache save', e.message); } }
+
+// Search area: a radius around Boston instead of one state, so southern NH, RI and
+// central MA postings come in with the SAME number of calls. ADZUNA_AREA_MODE=state
+// switches back to each lane's own state search.
+const ADZUNA_AREA = process.env.ADZUNA_AREA || 'Boston, MA';
+const ADZUNA_RADIUS_KM = Number(process.env.ADZUNA_RADIUS_KM || 120); // ~75 miles: Londonderry NH, Providence RI, Worcester
+const AREA_MODE = process.env.ADZUNA_AREA_MODE === 'state' ? 'state' : 'radius';
+
+// Adzuna's free tier: 25/min, 250/day, 1,000/week, 2,500/month. Count every call and stop
+// before the limits; the board then serves the last saved results instead of erroring.
+const ADZUNA_USAGE_FILE = pathx.join(process.env.DATA_DIR || osx.tmpdir(), 'opsboard-adzuna-usage.json');
+const ADZUNA_LIMITS = { day: Number(process.env.ADZUNA_DAILY_LIMIT || 230), week: Number(process.env.ADZUNA_WEEKLY_LIMIT || 950), month: Number(process.env.ADZUNA_MONTHLY_LIMIT || 2400) };
+let adzunaUsage = (() => { try { return JSON.parse(fsx.readFileSync(ADZUNA_USAGE_FILE, 'utf8')); } catch (_) { return { calls: [] }; } })();
+function adzunaCounts() {
+  const now = Date.now();
+  adzunaUsage.calls = (adzunaUsage.calls || []).filter(t => now - t < 31 * 86400000);
+  const month = new Date().toISOString().slice(0, 7);
+  return { day: adzunaUsage.calls.filter(t => now - t < 86400000).length, week: adzunaUsage.calls.filter(t => now - t < 7 * 86400000).length,
+    month: adzunaUsage.calls.filter(t => new Date(t).toISOString().slice(0, 7) === month).length };
+}
+function adzunaBudgetLeft(n) { const c = adzunaCounts(); return c.day + n <= ADZUNA_LIMITS.day && c.week + n <= ADZUNA_LIMITS.week && c.month + n <= ADZUNA_LIMITS.month; }
+function recordAdzunaCall() { adzunaUsage.calls.push(Date.now()); try { fsx.writeFileSync(ADZUNA_USAGE_FILE, JSON.stringify(adzunaUsage)); } catch (_) {} }
 
 // All Adzuna calls across the whole app funnel through this single queue,
 // one request at a time with a short gap between them. Without this, firing
@@ -126,16 +152,19 @@ function queueAdzunaCall(fn) {
 }
 
 async function fetchOnePhrase(phrase, where) {
+  if (!adzunaBudgetLeft(1)) throw new Error('Adzuna free-tier limit reached for now — showing your last saved results');
   const url = new URL(`https://api.adzuna.com/v1/api/jobs/us/search/1`);
   url.searchParams.set('app_id', APP_ID);
   url.searchParams.set('app_key', APP_KEY);
   url.searchParams.set('what', phrase);
-  url.searchParams.set('where', where);
+  if (AREA_MODE === 'radius') { url.searchParams.set('where', ADZUNA_AREA); url.searchParams.set('distance', String(ADZUNA_RADIUS_KM)); }
+  else url.searchParams.set('where', where);
   url.searchParams.set('results_per_page', '50'); // Adzuna max per request — same API cost as 20
   url.searchParams.set('sort_by', 'date');
   url.searchParams.set('content-type', 'application/json');
 
   return queueAdzunaCall(async () => {
+    recordAdzunaCall();
     const res = await fetch(url.toString());
     if (!res.ok) {
       const text = await res.text().catch(() => '');
@@ -197,10 +226,23 @@ async function getLane(laneKey, forceRefresh = false) {
   if (!forceRefresh && cached && (now - cached.fetchedAt) < CACHE_TTL_MS) {
     return { ...cached, fromCache: true };
   }
-  const jobs = await fetchLaneFromAdzuna(laneKey);
-  const entry = { fetchedAt: now, jobs };
-  cache[laneKey] = entry;
-  return { ...entry, fromCache: false };
+  const phrases = Array.isArray(LANES[laneKey].what) ? LANES[laneKey].what.length : 1;
+  const fail = laneFailures[laneKey];
+  if (!forceRefresh && fail && now - fail.at < 30 * 60 * 1000) { // failed recently: don't spend calls retrying on every page load
+    if (cached) return { ...cached, fromCache: true, note: fail.msg };
+    throw new Error(fail.msg);
+  }
+  if (cached && !adzunaBudgetLeft(phrases)) return { ...cached, fromCache: true, note: 'Adzuna free-tier limit near — showing saved results' };
+  try {
+    const jobs = await fetchLaneFromAdzuna(laneKey);
+    const entry = { fetchedAt: now, jobs, area: AREA_MODE === 'radius' ? `${ADZUNA_AREA} + ${ADZUNA_RADIUS_KM} km` : LANES[laneKey].where };
+    cache[laneKey] = entry; saveLaneCache(); delete laneFailures[laneKey];
+    return { ...entry, fromCache: false };
+  } catch (e) {
+    laneFailures[laneKey] = { at: now, msg: e.message };
+    if (cached) return { ...cached, fromCache: true, note: e.message }; // keep showing the last good results
+    throw e;
+  }
 }
 
 // ---- Routes ----
@@ -260,7 +302,7 @@ app.get('/api/jobs/all', async (req, res) => {
 });
 
 // What each extra source returned, which company boards were found, errors.
-app.get('/api/sources/status', (req, res) => res.json(sources.sourcesStatus()));
+app.get('/api/sources/status', (req, res) => res.json({ ...sources.sourcesStatus(), adzuna: { usage: adzunaCounts(), limits: ADZUNA_LIMITS, area: AREA_MODE === 'radius' ? `${ADZUNA_AREA} + ${ADZUNA_RADIUS_KM} km` : 'each lane\'s state', cacheHours: CACHE_TTL_MS / 3600000 } }));
 // Target Companies: all postings from company boards + The Muse, for matching to his 25 targets (free)
 app.get('/api/targets/jobs', async (req, res) => {
   try { res.json(await sources.targetJobs()); } catch (e) { res.status(502).json({ error: e.message }); }
