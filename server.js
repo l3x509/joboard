@@ -261,6 +261,10 @@ app.get('/api/jobs/all', async (req, res) => {
 
 // What each extra source returned, which company boards were found, errors.
 app.get('/api/sources/status', (req, res) => res.json(sources.sourcesStatus()));
+// Target Companies: all postings from company boards + The Muse, for matching to his 25 targets (free)
+app.get('/api/targets/jobs', async (req, res) => {
+  try { res.json(await sources.targetJobs()); } catch (e) { res.status(502).json({ error: e.message }); }
+});
 
 // Find a company's public job board: /api/ats/discover?name=Outset Medical
 app.get('/api/ats/discover', async (req, res) => {

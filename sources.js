@@ -185,6 +185,10 @@ const DISCOVER_COMPANIES = [
   'Claroty', 'Asimily', 'Ordr', 'Cynerio', 'Medcrypt', 'Field Nation', 'Global Network Systems', 'SymQuest',
   'Open Approach', 'InterMed Group', 'Agiliti', 'TRIMEDX', 'Imprivata', 'Rapid7', 'Butterfly Network', 'Insulet',
   'Ophthalmic Instrument Company', 'Lombart Instrument', 'IT Support RI', 'Greenway Health', 'Nuvolo', 'Censinet',
+  // Rest of his 25 target companies (Oct 17, 2026) so every one gets a lookup.
+  // Big employers on Workday/iCIMS won't be found — the dashboard marks those "manual check".
+  'Sodexo', 'Mass General Brigham', 'Boston Medical Center', 'EssilorLuxottica', 'IQVIA', 'Crothall Healthcare',
+  'Experis', 'TESA Talent Advisory', 'DC Medical', 'New England Ophthalmic Instrument Service',
 ];
 function slugCandidates(name) {
   const base = name.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9 ]/g, '').trim();
@@ -284,6 +288,17 @@ async function getExtraSources(forceRefresh = false) {
   return byLane([...state.muse.jobs, ...state.boards.jobs]);
 }
 
+// For the Target Companies view: every board + Muse posting (location/age filtered,
+// NOT lane-filtered) so a target's sales or ops roles still show under its card.
+async function targetJobs() {
+  await getExtraSources(false);
+  return {
+    jobs: [...state.boards.jobs, ...state.muse.jobs],
+    boards: state.boards.perBoard.map(b => ({ company: b.company, ats: b.ats, slug: b.slug, total: b.total || 0, kept: b.kept || 0, error: b.error || null })),
+    discoveryRanAt: state.discovery.ranAt || null, fetchedAt: state.boards.fetchedAt || null,
+  };
+}
+
 function sourcesStatus() {
   const muse = byLane(state.muse.jobs);
   return {
@@ -294,4 +309,4 @@ function sourcesStatus() {
   };
 }
 
-module.exports = { getExtraSources, sourcesStatus, discoverCompany, fetchBoards, byLane, ATS, classifyLane, locationOk };
+module.exports = { getExtraSources, sourcesStatus, targetJobs, discoverCompany, fetchBoards, byLane, ATS, classifyLane, locationOk };

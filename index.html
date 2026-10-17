@@ -254,6 +254,19 @@
     margin-left: auto; padding-bottom: 6px; white-space: nowrap;
   }
 
+  .tcov { font-family: var(--mono); font-size: 9.5px; padding: 1px 6px; border-radius: 3px; margin-left: 6px; border: 1px solid var(--line); color: var(--text-faint); }
+  .tcov-auto { border-color: var(--green); color: var(--green); }
+  .tcov-sites { border-color: var(--teal-dim); color: var(--teal); }
+  .tcov-manual { border-style: dashed; }
+  .tnew { font-family: var(--mono); font-size: 10px; padding: 1px 6px; border-radius: 3px; background: var(--amber); color: var(--bg); font-weight: 600; }
+  .target-card.has-new { border-color: var(--amber-dim); }
+  .tjobs { display: grid; gap: 6px; margin: 10px 0; padding: 8px 10px; background: var(--panel-2, var(--panel)); border: 1px solid var(--line); border-radius: 6px; }
+  .tjob { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; font-size: 13px; }
+  .tjob a { color: var(--text); }
+  .tjob-meta { grid-column: 1; font-size: 11px; color: var(--text-faint); }
+  .tjob .rel-meter, .tjob > :last-child { grid-column: 2; grid-row: 1 / span 2; }
+  .tcheck.done { border-color: var(--green); color: var(--green); }
+  .nav-count.new { background: var(--amber); color: var(--bg); }
   .card-lane-tag {
     font-family: var(--mono); font-size: 9px; letter-spacing: .05em; text-transform: uppercase;
     color: var(--teal); background: var(--teal-dim); border-radius: 3px; padding: 2px 6px;
@@ -833,32 +846,146 @@
   function loadTargetStatus() { try { return JSON.parse(localStorage.getItem(TARGETS_STATUS_KEY) || '{}'); } catch (e) { return {}; } }
   function saveTargetStatus(d) { try { localStorage.setItem(TARGETS_STATUS_KEY, JSON.stringify(d)); } catch (e) {} }
 
+  // ===== Target Companies: postings per company, new this week, weekly manual checks =====
+  // How each target's company name appears on job postings (Adzuna, The Muse, company boards)
+  const TARGET_MATCH = {
+    'Ophthalmic Instrument Co. (OIC)': /ophthalmic instrument co|\boic\b/i,
+    'Heidelberg Engineering US': /heidelberg engineering/i,
+    'Optos': /\boptos\b/i,
+    'Topcon Healthcare': /\btopcon\b/i,
+    'CodexIT': /\bcodex ?it\b/i,
+    'ERC Networks': /\berc networks?\b/i,
+    'Sodexo HTM': /\bsodexo\b/i,
+    'DAS Health': /\bdas health\b/i,
+    'IT Support RI': /\bit support ri\b/i,
+    'Lombart Instrument': /\blombart\b/i,
+    'New England Ophthalmic Instrument Service': /new england ophthalmic/i,
+    'EssilorLuxottica': /essilor|luxottica/i,
+    'CloudWave': /\bcloud ?wave\b/i,
+    'Mass General Brigham': /mass(achusetts)? general|\bbrigham\b|\bmgb\b/i,
+    'Boston Medical Center': /boston medical center|\bbmc health/i,
+    'Claroty / Asimily / Armis / Ordr': /\bclaroty\b|\basimily\b|\barmis\b|\bordr\b/i,
+    'IQVIA MedTech': /\biqvia\b/i,
+    'Global Network Systems': /global network systems/i,
+    'SymQuest': /\bsymquest\b/i,
+    'Open Approach': /\bopen approach\b/i,
+    'Crothall Healthcare': /\bcrothall\b/i,
+    'DC Medical': /\bdc medical\b/i,
+    'TESA Talent Advisory': /\btesa\b/i,
+    'Experis': /\bexperis\b|manpowergroup/i,
+    'Field Nation': /\bfield ?nation\b/i,
+  };
+  const TARGET_SEEN_KEY = 'target-seen-v1';       // { postingId: firstSeenISO | 'baseline' }
+  const TARGET_CHECKED_KEY = 'target-checked-v1'; // { targetName: 'YYYY-MM-DD' (Monday of the week checked) }
+  const TARGET_JOBS_KEY = 'target-jobs-v1';       // last server pull, so the page renders instantly
+  let targetServer = loadJSON(TARGET_JOBS_KEY, null);
+  let targetFetching = false;
+  let targetOpen = {};    // which cards show all postings
+
+  function weekStart(d = new Date()) { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - day); return x.toISOString().slice(0, 10); }
+  async function fetchTargetJobs(force) {
+    if (targetFetching) return;
+    if (!force && targetServer && Date.now() - (targetServer.pulledAt || 0) < 30 * 60 * 1000) return;
+    targetFetching = true;
+    try { const r = await fetch('/api/targets/jobs'); if (r.ok) { targetServer = { ...(await r.json()), pulledAt: Date.now() }; saveJSON(TARGET_JOBS_KEY, targetServer); } }
+    catch (e) { /* optional source */ }
+    targetFetching = false;
+  }
+
+  // Every posting we know about, matched to targets. Returns { byTarget: {name: [jobs]}, coverage: {name: 'auto'|'sites'|'manual'}, boardsFor }
+  function targetPostings() {
+    const pool = new Map();
+    const add = j => { if (!j || !j.id || dismissedIds[j.id]) return; if (!pool.has(j.id)) pool.set(j.id, j); };
+    Object.values(liveData).forEach(l => (l.jobs || []).forEach(add));
+    ((targetServer && targetServer.jobs) || []).forEach(add);
+    const boards = (targetServer && targetServer.boards) || [];
+    const seen = loadJSON(TARGET_SEEN_KEY, {});
+    // First full load (job sites AND company boards both in): everything already open counts as "existing", not new
+    const baseline = !loadJSON('target-baseline-v1', false);
+    const now = new Date().toISOString();
+    let changed = false;
+    const byTarget = {}, coverage = {}, boardsFor = {};
+    TARGETS.forEach(t => {
+      const rx = TARGET_MATCH[t.n]; byTarget[t.n] = [];
+      boardsFor[t.n] = rx ? boards.filter(b => rx.test(b.company) && !b.error) : [];
+      if (!rx) { coverage[t.n] = 'manual'; return; }
+      const keys = new Set();
+      pool.forEach(j => {
+        if (!rx.test(j.company || '')) return;
+        const k = dedupeKey(j); if (keys.has(k)) return; keys.add(k);
+        if (!seen[j.id]) { seen[j.id] = baseline ? 'baseline' : now; changed = true; }
+        byTarget[t.n].push({ ...j, _first: seen[j.id] });
+      });
+      byTarget[t.n].sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
+      coverage[t.n] = boardsFor[t.n].length ? 'auto' : byTarget[t.n].length ? 'sites' : 'manual';
+    });
+    if (changed) saveJSON(TARGET_SEEN_KEY, seen);
+    if (baseline && targetServer && Object.keys(liveData).length) saveJSON('target-baseline-v1', true);
+    return { byTarget, coverage, boardsFor };
+  }
+  const isNewThisWeek = j => j._first && j._first !== 'baseline' && Date.now() - new Date(j._first) < 7 * 86400000;
+  function targetNewCount() { try { const { byTarget } = targetPostings(); return Object.values(byTarget).reduce((s, js) => s + js.filter(isNewThisWeek).length, 0); } catch (e) { return 0; } }
+
   function renderTargets(el) {
     const st = loadTargetStatus();
+    const checked = loadJSON(TARGET_CHECKED_KEY, {});
+    const wk = weekStart();
+    const { byTarget, coverage, boardsFor } = targetPostings();
     const cats = ['All', ...new Set(TARGETS.map(t => t.c))];
     const rank = { A: 0, B: 1, C: 2 };
-    const list = TARGETS.filter(t => targetCat === 'All' || t.c === targetCat).sort((a, b) => rank[a.f] - rank[b.f]);
+    const newOf = t => byTarget[t.n].filter(isNewThisWeek).length;
+    const needsCheck = t => coverage[t.n] !== 'auto' && checked[t.n] !== wk;
+    const list = TARGETS.filter(t => targetCat === 'All' || t.c === targetCat)
+      .sort((a, b) => newOf(b) - newOf(a) || byTarget[b.n].length - byTarget[a.n].length || rank[a.f] - rank[b.f]);
     const contacted = TARGETS.filter(t => ['Contacted', 'Applied', 'Interview'].includes(st[t.n])).length;
+    const nAuto = TARGETS.filter(t => coverage[t.n] === 'auto').length, nSites = TARGETS.filter(t => coverage[t.n] === 'sites').length;
+    const manual = TARGETS.filter(t => coverage[t.n] !== 'auto');
+    const manualDone = manual.filter(t => checked[t.n] === wk).length;
+    const totalNew = TARGETS.reduce((s, t) => s + newOf(t), 0);
+    const totalOpen = TARGETS.reduce((s, t) => s + byTarget[t.n].length, 0);
+    const covLabel = { auto: ['Auto-watched', 'Postings pulled straight from the company job board'], sites: ['Via job sites', 'Postings found on Adzuna or The Muse; the company board itself is not readable, so also check it weekly'], manual: ['Manual check', 'No postings found automatically; open the careers page once a week'] };
+    const ago = d => d ? postedAgoLabel(d) : '';
+
     el.innerHTML = `
       <div class="lane-header"><div class="lane-header-top"><div>
         <h1 class="lane-title">Target Companies</h1>
         <div class="lane-sub">${TARGETS.length} New England firms matched to your device, clinical IT and security work · ${TARGETS.filter(t => t.f === 'A').length} A-fit · ${contacted} contacted</div>
-      </div></div>
+      </div>
+      <button class="tb-btn" id="tRefresh" ${targetFetching ? 'disabled' : ''}>${targetFetching ? 'Refreshing…' : '🔄 Refresh postings'}</button></div>
       <div class="context-note">Check your Resourceful non-solicit before contacting any practice you serviced for Zeiss. "+ Track" sends a company to your Lead Tracker.</div></div>
+
+      <div class="isec"><div class="ikpis">
+        <div class="ik ${totalNew ? 'good' : ''}"><div class="ik-v">${totalNew}</div><div class="ik-l">new posting${totalNew === 1 ? "" : "s"} this week</div><div class="ik-n">first seen in the last 7 days</div></div>
+        <div class="ik"><div class="ik-v">${totalOpen}</div><div class="ik-l">open postings at targets</div><div class="ik-n">New England or remote · last 60 days</div></div>
+        <div class="ik"><div class="ik-v">${nAuto}<small>/${TARGETS.length}</small></div><div class="ik-l">auto-watched boards</div><div class="ik-n">${nSites} more via job sites${targetServer && targetServer.discoveryRanAt ? ` · lookup ${ago(new Date(targetServer.discoveryRanAt).toISOString())}` : ''}</div></div>
+        <div class="ik ${manualDone === manual.length ? 'good' : 'warn'}"><div class="ik-v">${manualDone}<small>/${manual.length}</small></div><div class="ik-l">checked by hand this week</div><div class="ik-n">resets every Monday</div></div>
+      </div></div>
+
       <div class="companies-row" style="margin:12px 0;">${cats.map(c => `<button class="company-chip ${c === targetCat ? 'checked' : ''}" data-tcat="${escapeAttr(c)}">${escapeHtml(c)}</button>`).join('')}</div>
       <div class="pane"><div class="pane-body">${list.map(t => {
         const s = st[t.n] || 'Not started';
         const i = TARGETS.indexOf(t);
-        return `<div class="posting-card target-card ${s === 'Not a fit' ? 'dismissed' : ''}">
+        const jobs = byTarget[t.n], nNew = newOf(t), cov = coverage[t.n];
+        const shown = targetOpen[t.n] ? jobs : jobs.slice(0, 4);
+        const isChecked = checked[t.n] === wk;
+        return `<div class="posting-card target-card ${s === 'Not a fit' ? 'dismissed' : ''} ${nNew ? 'has-new' : ''}">
           <div class="posting-top"><div>
             <span class="card-lane-tag">${escapeHtml(t.c)}</span>
-            <div class="posting-title">${escapeHtml(t.n)} <span class="fit-badge target-fit-${t.f}">FIT ${t.f}</span></div>
-            <div class="posting-company">${escapeHtml(t.loc)} · ${escapeHtml(laneLabel(t.lane))} lane</div>
+            <span class="tcov tcov-${cov}" title="${escapeAttr(covLabel[cov][1])}${boardsFor[t.n].length ? ` (${boardsFor[t.n].map(b => b.company + ' on ' + b.ats).join(', ')})` : ''}">${covLabel[cov][0]}</span>
+            <div class="posting-title">${escapeHtml(t.n)} <span class="fit-badge target-fit-${t.f}">FIT ${t.f}</span>${nNew ? ` <span class="tnew">${nNew} new this week</span>` : ''}</div>
+            <div class="posting-company">${escapeHtml(t.loc)} · ${escapeHtml(laneLabel(t.lane))} lane · ${jobs.length ? `${jobs.length} open posting${jobs.length > 1 ? 's' : ''}` : 'no postings found'}</div>
           </div></div>
+          ${jobs.length ? `<div class="tjobs">${shown.map(j => { const f = scoreFit({ ...j, desc: j.desc || j.text || j.fullText || '' }); return `<div class="tjob">
+              <span><a target="_blank" rel="noopener" href="${escapeAttr(j.url || '#')}">${escapeHtml(j.title)}</a>${isNewThisWeek(j) ? ' <span class="tnew">NEW</span>' : ''}</span>
+              <span class="tjob-meta">${escapeHtml(j.location || '')}${j.created ? ' · ' + escapeHtml(ago(j.created)) : ''} · ${escapeHtml(j.source || '')}</span>
+              ${relevanceMeter(f.score, '', `Fit ${f.score}/100`)}
+            </div>`; }).join('')}
+            ${jobs.length > 4 ? `<button class="curated-collapse-btn" data-topen="${i}">${targetOpen[t.n] ? 'Show fewer' : `Show all ${jobs.length}`}</button>` : ''}</div>` : ''}
           <div class="posting-desc">${escapeHtml(t.w)}</div>
           <div class="posting-desc"><b style="color:var(--amber)">Next:</b> ${escapeHtml(t.m)}</div>
           <div class="posting-actions">
-            ${t.url ? `<a class="posting-apply" target="_blank" href="${escapeAttr(t.url)}">Open site ↗</a>` : ''}
+            ${t.url ? `<a class="posting-apply" target="_blank" href="${escapeAttr(t.url)}">${cov === 'auto' ? 'Open site ↗' : 'Open careers / site ↗'}</a>` : ''}
+            ${cov !== 'auto' ? `<button class="track-btn tcheck ${isChecked ? 'done' : ''}" data-tcheck="${i}" title="Tick after you look at their careers page. Resets every Monday.">${isChecked ? '✓ Checked this week' : '☐ Checked this week'}</button>` : ''}
             <button class="track-btn" data-ttrack="${i}">+ Track</button>
             <select class="target-status" data-tstatus="${i}" aria-label="Status for ${escapeAttr(t.n)}">${TARGET_STATUSES.map(x => `<option ${x === s ? 'selected' : ''}>${x}</option>`).join('')}</select>
           </div>
@@ -875,6 +1002,14 @@
       const t = TARGETS[+b.getAttribute('data-ttrack')];
       prefillLead(`Outreach — ${t.c}`, t.n, t.url, t.lane);
     }));
+    el.querySelectorAll('[data-tcheck]').forEach(b => b.addEventListener('click', () => {
+      const name = TARGETS[+b.getAttribute('data-tcheck')].n;
+      const c = loadJSON(TARGET_CHECKED_KEY, {}); c[name] = c[name] === wk ? '' : wk; saveJSON(TARGET_CHECKED_KEY, c);
+      renderTargets(el); renderNav();
+    }));
+    el.querySelectorAll('[data-topen]').forEach(b => b.addEventListener('click', () => { const n = TARGETS[+b.getAttribute('data-topen')].n; targetOpen[n] = !targetOpen[n]; renderTargets(el); }));
+    const rb = el.querySelector('#tRefresh'); if (rb) rb.addEventListener('click', async () => { const p = fetchTargetJobs(true); renderTargets(el); await p; if (activeLane === TARGETS_ID) renderTargets(el); renderNav(); showToast('Target postings refreshed'); });
+    if (!targetServer || Date.now() - (targetServer.pulledAt || 0) > 30 * 60 * 1000) fetchTargetJobs().then(() => { if (activeLane === TARGETS_ID) renderTargets(el); renderNav(); });
   }
 
   // ===================================================================
@@ -2406,7 +2541,7 @@
       <div class="nav-item all-lanes ${activeLane === TARGETS_ID ? 'active' : ''}" data-nav="${TARGETS_ID}">
         <span class="nav-num">◎</span>
         <span class="nav-label">Target Companies</span>
-        <span class="nav-badges"><span class="nav-count">${TARGETS.length}</span></span>
+        <span class="nav-badges">${(() => { const n = targetNewCount(); return n ? `<span class="nav-count new">${n} new</span>` : `<span class="nav-count">${TARGETS.length}</span>`; })()}</span>
       </div>
       <div class="nav-divider"></div>`;
 
@@ -2972,6 +3107,7 @@
         total += (laneResult.jobs || []).length;
       });
       computeNewSinceLastVisit(jobsByLane);
+      fetchTargetJobs(true).then(() => { renderNav(); if (activeLane === TARGETS_ID) renderMain(); });
       lastFetchedTotal = total;
       updateLiveStatus();
       renderNav();
